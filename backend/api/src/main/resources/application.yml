@@ -20,12 +20,11 @@ spring:
 
 security:
   password-encoder:
-    secret: ${PWD_ENCODER_SECRET:fsdcgscdrwrcdxgfscdfdscdgfcgw}
+    secret: ${PASSWORD_ENCODER_SECRET:fsdcgscdrwrcdxgfscdfdscdgfcgw}
   jwt:
     auth-secret: ${JWT_SECRET:vjxkcjvkfldvkdfjvjdfnvjkdjshdnksjdv}
     access-expiration: ${JWT_ACCESS_EXPIRATION:PT30M}
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:PT12H}
-    recovery-password-expiration: ${JWT_RECOVERY_EXPIRATION:PT12H}
     issuer: ${spring.application.name}
 
 livekit:

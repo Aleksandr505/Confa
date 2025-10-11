@@ -7,6 +7,5 @@ public record JWTProp(
         String issuer,
         String authSecret,
         String accessExpiration,
-        String refreshExpiration,
-        String recoveryPasswordExpiration
+        String refreshExpiration
 ) {}
