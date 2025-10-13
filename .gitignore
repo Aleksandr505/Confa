@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 
 .env
+deploy/client.build.env
+deploy/libs

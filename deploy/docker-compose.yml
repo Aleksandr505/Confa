@@ -1,0 +1,98 @@
+name: confa
+
+services:
+  api:
+    image: ${API_IMAGE}
+    container_name: api
+    env_file:
+      - .env
+    environment:
+      - APP_PORT=${APP_PORT}
+      - APP_NAME=${APP_NAME}
+      - ACTIVE_PROFILES=${ACTIVE_PROFILES}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - PASSWORD_ENCODER_SECRET=${PASSWORD_ENCODER_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ACCESS_EXPIRATION=${JWT_ACCESS_EXPIRATION}
+      - JWT_REFRESH_EXPIRATION=${JWT_REFRESH_EXPIRATION}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+    expose:
+      - "8080"
+    networks: [shared_web]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      liquibase-migrations:
+        condition: service_completed_successfully
+
+  client:
+    image: ${CLIENT_IMAGE}
+    container_name: client
+      #ports:
+      #- "3000:80"
+    expose:
+      - "80"
+    networks: [shared_web]
+
+    #  admin:
+    #  image: ${ADMIN_IMAGE}
+    # container_name: admin
+    # expose:
+    #   - "80"
+    #  networks: [shared_web]
+
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    env_file:
+      - .env
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME}
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks: [shared_web]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  liquibase-migrations:
+    image: liquibase/liquibase:latest
+    container_name: liquibase-migrations
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks: [ shared_web ]
+    volumes:
+      - ../backend/api/src/main/resources:/liquibase/changelog:ro
+      - ./libs/mysql-connector-j-8.3.0.jar:/liquibase/lib/mysql-connector-java.jar
+    env_file:
+      - .env
+    command:
+      - --driver=com.mysql.cj.jdbc.Driver
+      - --url=jdbc:mysql://mysql:3306/${DB_NAME}
+      - --changeLogFile=space/confa/api/db/changelog/liquibase-changelog.yaml
+      - --username=${DB_USERNAME}
+      - --password=${DB_PASSWORD}
+      - update
+    restart: "no"
+
+volumes:
+  mysql_data:
+
+# Before start docker-compose create network:
+# docker network ls
+# docker network create shared_web
+networks:
+  shared_web:
+    external: true
