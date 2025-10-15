@@ -1,6 +1,31 @@
 name: confa
 
 services:
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [ shared_web ]
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit
+    restart: unless-stopped
+    command: [ "--config","/etc/livekit/livekit.yaml" ]
+    volumes:
+      - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
+    networks: [ shared_web ]
+    ports:
+      - "3478:3478/udp"
+      - "50000-50050:50000-50050/udp"
+
   api:
     image: ${API_IMAGE}
     container_name: api
@@ -88,6 +113,8 @@ services:
     restart: "no"
 
 volumes:
+  caddy_data:
+  caddy_config:
   mysql_data:
 
 # Before start docker-compose create network:
@@ -95,4 +122,4 @@ volumes:
 # docker network create shared_web
 networks:
   shared_web:
-    external: true
+    driver: bridge

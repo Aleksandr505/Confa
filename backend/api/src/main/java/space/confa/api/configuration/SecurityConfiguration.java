@@ -16,9 +16,15 @@ import org.springframework.security.oauth2.server.resource.authentication.Reacti
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Mono;
+import space.confa.api.model.domain.AppHttpHeader;
 import space.confa.api.security.JwtGrantedAuthoritiesConverter;
+
+import java.util.List;
+
+import static org.springframework.security.authorization.AuthorityReactiveAuthorizationManager.hasRole;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -30,15 +36,23 @@ public class SecurityConfiguration {
     public CorsConfigurationSource corsConfigurationSource() {
         var c = new CorsConfiguration();
         c.setAllowCredentials(true);
-        c.addAllowedOriginPattern("http://localhost:5173");
+        c.setAllowedOriginPatterns(List.of(
+                "https://confa.space",
+                "https://admin.confa.space"
+        ));
         c.addAllowedHeader("*");
-        c.addAllowedMethod("*");
-        c.addExposedHeader(HttpHeaders.AUTHORIZATION);
-        c.addExposedHeader("X-Refresh-Token");
+        c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+        c.setExposedHeaders(List.of(HttpHeaders.AUTHORIZATION, AppHttpHeader.REFRESH_TOKEN));
+        c.setMaxAge(1800L);
 
         var s = new UrlBasedCorsConfigurationSource();
         s.registerCorsConfiguration("/**", c);
         return s;
+    }
+
+    @Bean
+    public CorsWebFilter corsWebFilter(CorsConfigurationSource source) {
+        return new CorsWebFilter(source);
     }
 
     @Bean
@@ -50,11 +64,12 @@ public class SecurityConfiguration {
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .logout(ServerHttpSecurity.LogoutSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        //.pathMatchers("/admin/**").access(hasRole("ADMIN"))
-                        .pathMatchers("/admin/**").permitAll()
-                        .pathMatchers(HttpMethod.POST, "/auth", "/auth/refresh").permitAll()
+                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .pathMatchers("/admin/**").access(hasRole("ADMIN"))
+                        //.pathMatchers("/admin/**").permitAll()
+                        .pathMatchers("/auth", "/auth/refresh").permitAll()
                         // test endpoint
-                        .pathMatchers(HttpMethod.POST, "/debug/**").permitAll()
+                        //.pathMatchers("/debug/**").permitAll()
                         .pathMatchers("/api/livekit/token").authenticated()
                         .anyExchange().authenticated()
                 )

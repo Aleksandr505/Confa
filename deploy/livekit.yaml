@@ -1,0 +1,11 @@
+# LiveKit configuration
+rtc:
+  port_range_start: 50000
+  port_range_end: 50050
+turn:
+  enabled: true
+  udp_port: 3478
+
+keys:
+  # Generate your key/secret
+  yourkey: yoursecret

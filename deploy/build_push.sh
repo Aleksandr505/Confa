@@ -16,10 +16,10 @@ cp backend/api/target/*.jar backend/api/target/app.jar
 docker buildx create --use --name mybuilder >/dev/null 2>&1 || true
 
 # API
-docker buildx build -t "$REG/api:$TAG" -f backend/api/Dockerfile backend/api --push
+docker buildx build --platform linux/amd64,linux/arm64 -t "$REG/api:$TAG" -f backend/api/Dockerfile backend/api --push
 
 # CLIENT
-docker buildx build -t "$REG/client:$TAG" -f frontend/client/Dockerfile frontend/client \
+docker buildx build --platform linux/amd64,linux/arm64 -t "$REG/client:$TAG" -f frontend/client/Dockerfile frontend/client \
   "${CLIENT_ARGS[@]}" --push
 
 echo "Pushed: $REG/api:$TAG, $REG/client:$TAG"

@@ -1,0 +1,16 @@
+# Client
+example.com {
+        encode gzip
+        reverse_proxy client:80
+}
+
+# API
+api.example.com {
+        encode gzip
+        reverse_proxy api:8080
+}
+
+# LiveKit
+live.example.com {
+        reverse_proxy livekit:7880
+}
