@@ -11,9 +11,21 @@ importers:
       '@livekit/agents':
         specifier: ~1.0.11
         version: 1.0.11(@livekit/rtc-node@0.13.20)
+      '@livekit/agents-plugin-assemblyai':
+        specifier: ^0.0.0
+        version: 0.0.0(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)
+      '@livekit/agents-plugin-cartesia':
+        specifier: ^1.0.17
+        version: 1.0.17(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)
+      '@livekit/agents-plugin-deepgram':
+        specifier: ^1.0.17
+        version: 1.0.17(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)
       '@livekit/agents-plugin-livekit':
         specifier: ~1.0.11
         version: 1.0.11(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))
+      '@livekit/agents-plugin-openai':
+        specifier: ^1.0.17
+        version: 1.0.17(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)(zod@3.25.76)
       '@livekit/agents-plugin-silero':
         specifier: ~1.0.11
         version: 1.0.11(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)
@@ -465,10 +477,34 @@ packages:
     resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
     engines: {node: '>=18.0.0'}
 
+  '@livekit/agents-plugin-assemblyai@0.0.0':
+    resolution: {integrity: sha512-UeCdtCzrcrsB9+pWHl7q8/kFtm1qOaydpyBnyg+E4z6rnnmFu1NdFAXyqJOOxDJfCXWp8Sx78nJLMvpHdvLj1Q==}
+    peerDependencies:
+      '@livekit/agents': ^0.7.7x
+      '@livekit/rtc-node': ^0.13.4
+
+  '@livekit/agents-plugin-cartesia@1.0.17':
+    resolution: {integrity: sha512-5iYbQly9GCkqWRffJcy6iYmnw5nFGsl4DpI4HpoH53KZzZdL95pAbQCOjXGDqbNi1slBcWqwDrVYiK1M5/h4Ig==}
+    peerDependencies:
+      '@livekit/agents': 1.0.17
+      '@livekit/rtc-node': ^0.13.12
+
+  '@livekit/agents-plugin-deepgram@1.0.17':
+    resolution: {integrity: sha512-D3q14Q0cdnRyx/Zd/Jajg2Ibw/zp5t8iJ/l6P/bmSUaH2Ep1ZyscF/VzZdSfGx37WwHj1SNIMNN+b4Mg8f26GQ==}
+    peerDependencies:
+      '@livekit/agents': 1.0.17
+      '@livekit/rtc-node': ^0.13.12
+
   '@livekit/agents-plugin-livekit@1.0.11':
     resolution: {integrity: sha512-1hZRonNmlXwRqcYP7IVSMKxXxCrBDvVia17A5urLyTTEv2sSTStUxcDb1XVcfisf5qkGjjqr0xLtN5CDnPKxvg==}
     peerDependencies:
       '@livekit/agents': 1.0.11
+
+  '@livekit/agents-plugin-openai@1.0.17':
+    resolution: {integrity: sha512-ReQYcWNU5kyb3dXvv6uVFX4AcJ+AE4EteWVkkJK8lbfRZXpb8dHyG2ZcLt/j/mWFN4StPm6UDQQZq5g2HFvJPw==}
+    peerDependencies:
+      '@livekit/agents': 1.0.17
+      '@livekit/rtc-node': ^0.13.12
 
   '@livekit/agents-plugin-silero@1.0.11':
     resolution: {integrity: sha512-00+qjEy1bwueGasu4XEVOUgS7dnRpmD0yylLDcFood+HJXstjKVN+V7IXcYSm/jeNJNYl/nRwpIUoOwvVoZtnA==}
@@ -601,6 +637,10 @@ packages:
   agentkeepalive@4.6.0:
     resolution: {integrity: sha512-kja8j7PjmncONqaTsB8fQ+wE2mSU2DJ9D4XKoJ5PFWIdRMa6SLSN1ff4mOr4jCbfRSsxR4keIiySJU0N9T5hIQ==}
     engines: {node: '>= 8.0.0'}
+
+  assemblyai@4.19.0:
+    resolution: {integrity: sha512-3yMTZoipmae16Xj3htLKtG/m7PMOt/enIn16u3leX9iF+GiTpzuj60aUqA3zq19lkoDauVlpWVy6PIYssWN1Nw==}
+    engines: {node: '>=18'}
 
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
@@ -1424,12 +1464,52 @@ snapshots:
     dependencies:
       minipass: 7.1.2
 
+  '@livekit/agents-plugin-assemblyai@0.0.0(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)':
+    dependencies:
+      '@livekit/agents': 1.0.11(@livekit/rtc-node@0.13.20)
+      '@livekit/rtc-node': 0.13.20
+      assemblyai: 4.19.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@livekit/agents-plugin-cartesia@1.0.17(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)':
+    dependencies:
+      '@livekit/agents': 1.0.11(@livekit/rtc-node@0.13.20)
+      '@livekit/rtc-node': 0.13.20
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@livekit/agents-plugin-deepgram@1.0.17(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)':
+    dependencies:
+      '@livekit/agents': 1.0.11(@livekit/rtc-node@0.13.20)
+      '@livekit/rtc-node': 0.13.20
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@livekit/agents-plugin-livekit@1.0.11(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))':
     dependencies:
       '@huggingface/hub': 2.4.1
       '@huggingface/transformers': 3.7.2
       '@livekit/agents': 1.0.11(@livekit/rtc-node@0.13.20)
       onnxruntime-node: 1.21.0
+
+  '@livekit/agents-plugin-openai@1.0.17(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)(zod@3.25.76)':
+    dependencies:
+      '@livekit/agents': 1.0.11(@livekit/rtc-node@0.13.20)
+      '@livekit/mutex': 1.1.1
+      '@livekit/rtc-node': 0.13.20
+      openai: 4.104.0(ws@8.18.3)(zod@3.25.76)
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - bufferutil
+      - encoding
+      - utf-8-validate
+      - zod
 
   '@livekit/agents-plugin-silero@1.0.11(@livekit/agents@1.0.11(@livekit/rtc-node@0.13.20))(@livekit/rtc-node@0.13.20)':
     dependencies:
@@ -1574,6 +1654,13 @@ snapshots:
   agentkeepalive@4.6.0:
     dependencies:
       humanize-ms: 1.2.1
+
+  assemblyai@4.19.0:
+    dependencies:
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   asynckit@0.4.0: {}
 

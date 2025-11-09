@@ -2,6 +2,11 @@ import {cli, defineAgent, type JobContext, type JobProcess, JobRequest, voice, W
 import * as silero from '@livekit/agents-plugin-silero';
 import {fileURLToPath} from 'node:url';
 import dotenv from 'dotenv';
+import * as openai from '@livekit/agents-plugin-openai';
+import * as assemblyai from '@livekit/agents-plugin-assemblyai';
+import * as cartesia from '@livekit/agents-plugin-cartesia';
+import * as deepgram from '@livekit/agents-plugin-deepgram';
+import { stt } from '@livekit/agents';
 
 dotenv.config({ path: '.env.local' });
 
@@ -26,11 +31,26 @@ export default defineAgent({
             instructions: 'You are a helpful AI coach that guides users in conversation.',
         });
 
+
+        const stt = new deepgram.STT({});
+
+        const llm = new openai.LLM({
+            model: 'gpt-4.1-mini',
+            apiKey: process.env.OPENAI_API_KEY!,
+        });
+
+        const tts = new cartesia.TTS({
+            model: "sonic-2",
+            voice: "6ccbfb76-1fc6-48f7-b71d-91ac6298247b",
+            apiKey: process.env.CARTESIA_API_KEY!,
+        });
+
+
         const session = new voice.AgentSession({
             vad,
-            stt: process.env.STT_PROVIDER || 'assemblyai/universal-streaming:en',
-            llm: process.env.LLM_PROVIDER || 'openai/gpt-4.1-mini',
-            tts: process.env.TTS_PROVIDER || 'cartesia/sonic-2',
+            stt: stt,
+            llm: llm,
+            tts: tts,
            // turnDetection: new livekit.turnDetector.MultilingualModel(),
         });
 
