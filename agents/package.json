@@ -1,0 +1,29 @@
+{
+  "name": "agents",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx src/agent.ts dev",
+    "start": "tsx src/agent.ts start",
+    "download-files": "tsx src/agent.ts download-files",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.18.3",
+  "type": "module",
+  "devDependencies": {
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@livekit/agents": "~1.0.11",
+    "@livekit/agents-plugin-livekit": "~1.0.11",
+    "@livekit/agents-plugin-silero": "~1.0.11",
+    "@livekit/noise-cancellation-node": "~0.1.9",
+    "dotenv": "^17.2.3",
+    "undici": "^7.16.0"
+  }
+}
