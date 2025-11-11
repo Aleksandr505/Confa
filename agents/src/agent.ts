@@ -3,15 +3,15 @@ import * as silero from '@livekit/agents-plugin-silero';
 import {fileURLToPath} from 'node:url';
 import dotenv from 'dotenv';
 import * as openai from '@livekit/agents-plugin-openai';
-import * as assemblyai from '@livekit/agents-plugin-assemblyai';
+import OpenAI from 'openai';
 import * as cartesia from '@livekit/agents-plugin-cartesia';
 import * as deepgram from '@livekit/agents-plugin-deepgram';
-import { stt } from '@livekit/agents';
+
 
 dotenv.config({ path: '.env.local' });
 
 const requestFunc = async (req: JobRequest) => {
-    await req.accept('Agent Coach', `coach-${req.job.id}`);
+    await req.accept('Somebody', `agent-${req.job.id}`);
 };
 
 /**
@@ -23,21 +23,43 @@ export default defineAgent({
     },
 
     entry: async (ctx: JobContext) => {
-        console.log('STT=', process.env.STT_PROVIDER, 'LLM=', process.env.LLM_PROVIDER, 'TTS=', process.env.TTS_PROVIDER);
 
         const vad = ctx.proc.userData.vad! as silero.VAD;
 
         const assistant = new voice.Agent({
-            instructions: 'You are a helpful AI coach that guides users in conversation.',
+            instructions: 'You are a bored person who answers very briefly and reluctantly.',
         });
 
 
         const stt = new deepgram.STT({});
 
-        const llm = new openai.LLM({
-            model: 'gpt-4.1-mini',
-            apiKey: process.env.OPENAI_API_KEY!,
-        });
+        let llm;
+
+        if (process.env.LLM_PROVIDER === 'yandex') {
+            console.log('[LLM] Using YandexGPT');
+
+            const llmClient = new OpenAI({
+                apiKey: process.env.YANDEX_CLOUD_API_KEY!,
+                baseURL: 'https://llm.api.cloud.yandex.net/v1',
+                project: process.env.YANDEX_CLOUD_FOLDER!,
+            });
+
+            llm = new openai.LLM({
+                client: llmClient,
+                model: `gpt://${process.env.YANDEX_CLOUD_FOLDER!}/${process.env.YANDEX_CLOUD_MODEL!}`,
+                maxCompletionTokens: 50,
+                temperature: 0.3,
+            });
+        } else {
+            console.log('[LLM] Using OpenAI ChatGPT');
+
+            llm = new openai.LLM({
+                apiKey: process.env.OPENAI_API_KEY!,
+                model: 'gpt-4.1-mini',
+                maxCompletionTokens: 50,
+                temperature: 0.7,
+            });
+        }
 
         const tts = new cartesia.TTS({
             model: "sonic-2",
@@ -78,7 +100,7 @@ export default defineAgent({
         });
 
         await session.generateReply({
-            instructions: 'Greet the user and introduce yourself as their conversation coach.',
+            instructions: 'Greet the user and say something.',
         });
     },
 });
