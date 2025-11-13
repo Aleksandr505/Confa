@@ -28,6 +28,7 @@ security:
     issuer: ${spring.application.name}
 
 livekit:
+  host: ${LIVEKIT_URL:https://live.confa.space}
   apiKey: ${LIVEKIT_API_KEY:yourapikey}
   apiSecret: ${LIVEKIT_API_SECRET:yourapisecret}
   defaultRoom: demo

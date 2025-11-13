@@ -28,6 +28,6 @@ public class TokenController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateLivekitTokenDto dto
     ) {
-        return livekitTokenService.createToken(jwt, dto);
+        return livekitTokenService.createTokenForUser(jwt, dto);
     }
 }

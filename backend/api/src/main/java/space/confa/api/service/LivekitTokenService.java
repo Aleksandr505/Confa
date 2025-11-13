@@ -11,7 +11,6 @@ import space.confa.api.model.dto.request.CreateLivekitTokenDto;
 import space.confa.api.model.dto.response.LivekitTokenDto;
 
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -20,7 +19,7 @@ public class LivekitTokenService {
 
     private final LivekitProp props;
 
-    public Mono<LivekitTokenDto> createToken(Jwt userJwt, CreateLivekitTokenDto dto) {
+    public Mono<LivekitTokenDto> createTokenForUser(Jwt userJwt, CreateLivekitTokenDto dto) {
         AccessToken token = new AccessToken(props.apiKey(), props.apiSecret());
 
         if (dto.displayName() != null) {
@@ -41,9 +40,5 @@ public class LivekitTokenService {
 
     private String defaultRoom() {
         return props.defaultRoom() != null ? props.defaultRoom() : "demo";
-    }
-
-    private static String randomIdentity() {
-        return "user-" + UUID.randomUUID();
     }
 }

@@ -37,6 +37,7 @@ public class SecurityConfiguration {
         var c = new CorsConfiguration();
         c.setAllowCredentials(true);
         c.setAllowedOriginPatterns(List.of(
+                "http://localhost:5173",
                 "https://confa.space",
                 "https://admin.confa.space"
         ));
@@ -68,6 +69,7 @@ public class SecurityConfiguration {
                         .pathMatchers("/admin/**").access(hasRole("ADMIN"))
                         //.pathMatchers("/admin/**").permitAll()
                         .pathMatchers("/auth", "/auth/refresh").permitAll()
+                        .pathMatchers("/agents/**").permitAll()
                         // test endpoint
                         //.pathMatchers("/debug/**").permitAll()
                         .pathMatchers("/api/livekit/token").authenticated()
