@@ -70,6 +70,7 @@ public class SecurityConfiguration {
                         //.pathMatchers("/admin/**").permitAll()
                         .pathMatchers("/auth", "/auth/refresh").permitAll()
                         .pathMatchers("/agents/**").permitAll()
+                        .pathMatchers("/rooms/**").permitAll()
                         // test endpoint
                         //.pathMatchers("/debug/**").permitAll()
                         .pathMatchers("/api/livekit/token").authenticated()

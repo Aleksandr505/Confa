@@ -6,6 +6,8 @@ import livekit.LivekitModels;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import space.confa.api.model.dto.response.AgentInfoDto;
+import space.confa.api.model.dto.response.ParticipantInfoDto;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -43,14 +45,116 @@ public class AgentService {
         }
     }
 
-    public void fullMute(String room, String agentIdentity, boolean muted) {
+    public void fullMute(String room, String agentSid, boolean muted) {
         try {
             var payload = ("{\"topic\":\"control.muted\",\"value\":" + muted + "}").getBytes(StandardCharsets.UTF_8);
-            roomClient.sendData(room, payload, LivekitModels.DataPacket.Kind.RELIABLE, List.of(agentIdentity))
+            roomClient.sendData(room, payload, LivekitModels.DataPacket.Kind.RELIABLE, List.of(agentSid))
+                    .execute();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public List<AgentInfoDto> getAgentsByRoom(String room) {
+        try {
+            List<LivekitModels.ParticipantInfo> infos = roomClient.listParticipants(room).execute().body();
+
+            if (infos == null) {
+                return List.of();
+            }
+
+            return infos.stream()
+                    .filter(p -> p.getIdentity().startsWith("agent-"))
+                    .map(p -> {
+                        boolean audioMuted = p.getTracksList().stream()
+                                .filter(t -> t.getType() == LivekitModels.TrackType.AUDIO)
+                                .allMatch(LivekitModels.TrackInfo::getMuted);
+                        return new AgentInfoDto(
+                                p.getSid(),
+                                p.getIdentity(),
+                                p.getName(),
+                                audioMuted
+                        );
+                    })
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public void focusAgent(String room, String activeAgentIdentity, String userIdentity) {
+        try {
+            List<LivekitModels.ParticipantInfo> infos = roomClient.listParticipants(room).execute().body();
+            if (infos == null) {
+                return;
+            }
+
+            for (var p : infos) {
+                if (!p.getIdentity().startsWith("agent-")) {
+                    continue;
+                }
+
+                boolean isActive = p.getIdentity().equals(activeAgentIdentity);
+                fullMute(room, p.getSid(), !isActive);
+            }
+
+            String activeAgentSid = findParticipantSidByIdentity(room, activeAgentIdentity);
+            if (activeAgentSid == null) {
+                return;
+            }
+
+            var payload = ("{\"topic\":\"control.set_target\",\"value\":\"" + userIdentity + "\"}").getBytes(StandardCharsets.UTF_8);
+            roomClient.sendData(room, payload, LivekitModels.DataPacket.Kind.RELIABLE, List.of(activeAgentSid))
                     .execute();
 
-            roomClient.updateRoomMetadata(room, "{\"agentMuted\":" + muted + "}")
-                    .execute();
+
+            String metaJson = """
+          {
+            "activeAgentIdentity":"%s",
+            "agentListeningUser":"%s"
+          }
+          """.formatted(activeAgentIdentity, userIdentity);
+            roomClient.updateRoomMetadata(room, metaJson).execute();
+
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public List<ParticipantInfoDto> getParticipantsByRoom(String room) {
+        try {
+            List<LivekitModels.ParticipantInfo> infos = roomClient.listParticipants(room).execute().body();
+
+            if (infos == null) {
+                return List.of();
+            }
+
+            return infos.stream()
+                    .map(p -> new ParticipantInfoDto(
+                            p.getSid(),
+                            p.getIdentity(),
+                            p.getName(),
+                            p.getKind(),
+                            p.getMetadata()
+                    ))
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private String findParticipantSidByIdentity(String room, String identity) {
+        try {
+            List<LivekitModels.ParticipantInfo> infos = roomClient.listParticipants(room).execute().body();
+            if (infos == null) {
+                return null;
+            }
+
+            return infos.stream()
+                    .filter(p -> p.getIdentity().equals(identity))
+                    .map(LivekitModels.ParticipantInfo::getSid)
+                    .findFirst()
+                    .orElse(null);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

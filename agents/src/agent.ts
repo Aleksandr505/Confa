@@ -7,13 +7,46 @@ import OpenAI from 'openai';
 import * as cartesia from '@livekit/agents-plugin-cartesia';
 import * as deepgram from '@livekit/agents-plugin-deepgram';
 
+import { getAgentConfig, type AgentRole } from './configuration/config.js';
+import { ConfigurableAgent } from './configuration/configurableAgent.js';
+
 
 dotenv.config({ path: '.env.local' });
 
 const requestFunc = async (req: JobRequest) => {
-    console.log('[Agent] job:', { room: req.job.room?.name, agentName: req.job.agentName, dispatchId: req.job.dispatchId });
-    await req.accept('Agent', `agent-${req.job.id}`);
+    const meta = safeJSON<{ role?: AgentRole }>(req.job.metadata ?? '');
+    const role = meta?.role ?? (process.env.AGENT_ROLE as AgentRole) ?? 'bored';
+
+    const displayNameByRole: Record<AgentRole, string> = {
+        bored: 'Bored Agent',
+        friendly: 'Friendly Agent',
+        funny: 'Funny Agent',
+    };
+
+    const name = displayNameByRole[role];
+    const identity = `agent-${role}-${req.job.id}`;
+
+    console.log('[Agent] job:', {
+        room: req.job.room?.name,
+        agentName: req.job.agentName,
+        dispatchId: req.job.dispatchId,
+        metadata: req.job.metadata,
+        role,
+        name,
+        identity,
+    });
+
+    await req.accept(name, identity);
 };
+
+function resolveRole(ctx: JobContext): AgentRole {
+    const raw = ctx.job.metadata;
+    const meta = safeJSON<{ role?: string }>(raw);
+    const fromMeta = meta?.role as AgentRole | undefined;
+    if (fromMeta) return fromMeta;
+
+    return 'bored';
+}
 
 function requireEnv(name: string) {
     const v = process.env[name];
@@ -21,38 +54,20 @@ function requireEnv(name: string) {
     return v;
 }
 
-function safeJSON<T = any>(buf: Uint8Array): T | null {
+function safeJSON<T = any>(buf: Uint8Array | string | null | undefined): T | null {
+    if (!buf) return null;
+
+    let text: string;
+    if (typeof buf === 'string') {
+        text = buf;
+    } else {
+        text = new TextDecoder().decode(buf);
+    }
+
     try {
-        return JSON.parse(new TextDecoder().decode(buf)) as T;
+        return JSON.parse(text) as T;
     } catch {
         return null;
-    }
-}
-
-class BoredAgent extends voice.Agent {
-    public hardMuted = false;
-    private wakeWord = 'Agent';
-
-    constructor() {
-        super({
-            instructions: 'You are a bored person who answers very briefly and reluctantly (average 4-8 words).',
-        });
-    }
-
-    async onUserTurnCompleted(chatCtx: llm.ChatContext, newMessage: llm.ChatMessage): Promise<void> {
-        const text = newMessage.textContent?.toLowerCase?.() ?? '';
-
-        if (this.hardMuted) {
-            if (text.includes(this.wakeWord)) {
-                console.log('[Agent] wake word detected, unmuting');
-                this.hardMuted = false;
-
-                throw new voice.StopResponse();
-            }
-
-            throw new voice.StopResponse();
-        }
-
     }
 }
 
@@ -68,8 +83,9 @@ export default defineAgent({
 
         const vad = ctx.proc.userData.vad! as silero.VAD;
 
-        const assistant = new BoredAgent();
-
+        const role = resolveRole(ctx);
+        const cfg = getAgentConfig(role);
+        const assistant = new ConfigurableAgent(cfg);
 
         const stt = new deepgram.STT({});
 
@@ -116,6 +132,18 @@ export default defineAgent({
            // turnDetection: new livekit.turnDetector.MultilingualModel(),
         });
 
+
+        const roomIO = new voice.RoomIO({
+            agentSession: session,
+            room: ctx.room,
+            inputOptions: {
+                audioEnabled: true,
+                textEnabled: false,
+            },
+        });
+
+        roomIO.start();
+
         await ctx.connect();
 
         await session.start({
@@ -125,8 +153,16 @@ export default defineAgent({
 
         console.log(`[Agent] Connected as ${ctx.room.localParticipant?.identity} in ${ctx.room.name}`);
 
+        ctx.room.on('trackPublished', (pub, participant) => {
+            console.log('[Agent] trackPublished', {
+                participant: participant.identity,
+                kind: pub.kind,
+                sid: pub.sid,
+            });
+        });
 
         async function applyMuteState(newState: boolean) {
+            console.log(`[Agent] start mute agent with newState=${newState} and oldState=${assistant.hardMuted}`);
             if (assistant.hardMuted === newState) return;
             assistant.hardMuted = newState;
 
@@ -141,11 +177,33 @@ export default defineAgent({
             console.log(`[Agent] hardMuted=${assistant.hardMuted}`);
         }
 
-        ctx.room.on('dataReceived', async (payload) => {
+        ctx.room.on('dataReceived', async (payload, participant, kind) => {
+            console.log('[Agent] dataReceived raw:', {
+                from: participant?.identity,
+                kind,
+                bytes: payload.length,
+                text: new TextDecoder().decode(payload),
+            });
+
             const msg = safeJSON<{ topic?: string; value?: any }>(payload);
             if (!msg || !msg.topic) return;
 
+            console.log('[Agent] dataReceived parsed:', msg.topic, msg.value);
+
             switch (msg.topic) {
+                case 'control.set_target':
+                    const target =
+                        typeof msg.value === 'string'
+                            ? msg.value
+                            : msg.value != null
+                                ? String(msg.value)
+                                : undefined;
+
+                    if (target) {
+                        console.log('[Agent] switching target to', target);
+                        roomIO.setParticipant(target);
+                    }
+                    break;
                 case 'control.muted':
                     await applyMuteState(!!msg.value);
                     break;

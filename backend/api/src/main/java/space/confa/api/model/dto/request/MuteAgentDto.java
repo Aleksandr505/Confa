@@ -1,6 +1,6 @@
 package space.confa.api.model.dto.request;
 
-public record TargetAgentDto(
+public record MuteAgentDto(
         String room,
-        String agentIdentity
+        String agentSid
 ) {}
