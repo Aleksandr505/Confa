@@ -1,10 +1,6 @@
 import { http } from './lib/http';
 import { setTokens, loadTokensFromSession } from './lib/auth';
 
-const REFRESH_HEADER = import.meta.env.VITE_REFRESH_HEADER as string;
-
-export type LoginResponse = void;
-
 export async function login(username: string, password: string) {
     const resp = await fetch(`${import.meta.env.VITE_API_BASE}/auth`, {
         method: 'POST',
@@ -15,10 +11,9 @@ export async function login(username: string, password: string) {
     if (!resp.ok) throw new Error('Login failed');
 
     const authHeader = resp.headers.get('Authorization');
-    const refreshHeader = resp.headers.get(REFRESH_HEADER);
     const access = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
     if (!access) throw new Error('Access token missing');
-    setTokens(access || undefined, refreshHeader || undefined);
+    setTokens(access || undefined);
 }
 
 export async function fetchLivekitToken(room?: string, displayName?: string) {

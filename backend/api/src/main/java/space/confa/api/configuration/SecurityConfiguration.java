@@ -37,13 +37,13 @@ public class SecurityConfiguration {
         var c = new CorsConfiguration();
         c.setAllowCredentials(true);
         c.setAllowedOriginPatterns(List.of(
-                "http://localhost:5173",
+           //     "http://localhost:5173",
                 "https://confa.space",
                 "https://admin.confa.space"
         ));
         c.addAllowedHeader("*");
         c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
-        c.setExposedHeaders(List.of(HttpHeaders.AUTHORIZATION, AppHttpHeader.REFRESH_TOKEN));
+        c.setExposedHeaders(List.of(HttpHeaders.AUTHORIZATION));
         c.setMaxAge(1800L);
 
         var s = new UrlBasedCorsConfigurationSource();
@@ -69,8 +69,8 @@ public class SecurityConfiguration {
                         .pathMatchers("/admin/**").access(hasRole("ADMIN"))
                         //.pathMatchers("/admin/**").permitAll()
                         .pathMatchers("/auth", "/auth/refresh").permitAll()
-                        .pathMatchers("/agents/**").permitAll()
-                        .pathMatchers("/rooms/**").permitAll()
+                        .pathMatchers("/agents/**").access(hasRole("ADMIN"))
+                        .pathMatchers("/rooms/**").access(hasRole("ADMIN"))
                         // test endpoint
                         //.pathMatchers("/debug/**").permitAll()
                         .pathMatchers("/api/livekit/token").authenticated()

@@ -1,7 +1,6 @@
 const API_BASE = import.meta.env.VITE_API_BASE as string;
-const REFRESH_HEADER = import.meta.env.VITE_REFRESH_HEADER as string;
 
-import { getAccessToken, getRefreshToken, setTokens, clearTokens } from './auth';
+import { getAccessToken, setTokens, clearTokens } from './auth';
 
 function buildHeaders(init?: RequestInit): Headers {
     const h = new Headers(init?.headers);
@@ -18,21 +17,18 @@ function buildHeaders(init?: RequestInit): Headers {
 }
 
 async function tryRefresh(): Promise<boolean> {
-    const rt = getRefreshToken();
-    if (!rt) return false;
-
     const resp = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
-        headers: { [REFRESH_HEADER]: rt },
         credentials: 'include',
     });
     if (!resp.ok) return false;
 
     const newAccess = resp.headers.get('Authorization');
-    const newRefresh = resp.headers.get(REFRESH_HEADER);
-    const access = newAccess?.startsWith('Bearer ') ? newAccess.slice(7) : newAccess || undefined;
+    const access = newAccess?.startsWith('Bearer ')
+        ? newAccess.slice(7)
+        : newAccess || undefined;
 
-    setTokens(access, newRefresh || undefined);
+    setTokens(access);
     return !!access;
 }
 

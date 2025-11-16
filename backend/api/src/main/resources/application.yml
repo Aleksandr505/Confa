@@ -23,7 +23,7 @@ security:
     secret: ${PASSWORD_ENCODER_SECRET:fsdcgscdrwrcdxgfscdfdscdgfcgw}
   jwt:
     auth-secret: ${JWT_SECRET:vjxkcjvkfldvkdfjvjdfnvjkdjshdnksjdv}
-    access-expiration: ${JWT_ACCESS_EXPIRATION:PT30M}
+    access-expiration: ${JWT_ACCESS_EXPIRATION:PT10M}
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:PT12H}
     issuer: ${spring.application.name}
 

@@ -31,14 +31,14 @@ public class LoginService {
                 .onErrorMap(throwable -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Authentication failed"));
     }
 
-    public Mono<String> refreshToken(TokenPairDto dto) {
-        var userId = userService.getUserIdFromToken(dto.refreshToken());
+    public Mono<String> refreshToken(String refreshToken) {
+        var userId = userService.getUserIdFromToken(refreshToken);
 
         return userService.findById(userId)
                 .map(user ->
                         jwtService.generateAccessJWT(
-                                jwtService.getAuthJwtClaims(dto.refreshToken()),
-                                jwtService.getAuthJwtSubject(dto.refreshToken())
+                                jwtService.getAuthJwtClaims(refreshToken),
+                                jwtService.getAuthJwtSubject(refreshToken)
                         ).getTokenValue()
                 );
     }

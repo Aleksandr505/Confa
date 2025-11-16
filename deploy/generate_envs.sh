@@ -36,7 +36,6 @@ cat > deploy/client.build.env <<'EOF'
 # Build-time envs for Vite (client)
 VITE_API_BASE=http://api:8080
 VITE_LIVEKIT_WS_URL=wss://your.example.ru
-VITE_REFRESH_HEADER=X-Refresh-Token
 EOF
 
 echo "Generated deploy/.env, client.build.env for PROFILE=$PROFILE"
