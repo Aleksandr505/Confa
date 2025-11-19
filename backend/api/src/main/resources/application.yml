@@ -26,6 +26,8 @@ security:
     access-expiration: ${JWT_ACCESS_EXPIRATION:PT10M}
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:PT12H}
     issuer: ${spring.application.name}
+  init-bootstrap:
+    service-key: ${INIT_BOOTSTRAP_SERVICE_KEY:lmlkmlmlmnkmkmlmkmkmnlmkbvbvcb}
 
 livekit:
   host: ${LIVEKIT_URL:https://live.confa.space}

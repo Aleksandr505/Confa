@@ -1,0 +1,342 @@
+:root {
+    --bg-body: #020617;
+    --bg-elevated: #020617;
+    --bg-elevated-soft: #020617;
+    --border-subtle: #1f2937;
+    --fg-main: #e5e7eb;
+    --fg-muted: #9ca3af;
+    --accent: #6366f1;
+    --accent-soft: rgba(99, 102, 241, 0.12);
+    --danger: #f97373;
+    --radius-md: 14px;
+    --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.8);
+    --font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html, body, #root {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-body);
+    background: var(--bg-body);
+    color: var(--fg-main);
+}
+
+
+.gradient-bg {
+    background:
+            radial-gradient(circle at top left, rgba(129, 140, 248, 0.25), transparent 55%),
+            radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.16), transparent 55%),
+            #020617;
+}
+
+.fullpage-center {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+}
+
+.card {
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    padding: 20px 22px;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.card-narrow {
+    max-width: 480px;
+    width: 100%;
+}
+
+.card-inline {
+    margin-bottom: 16px;
+}
+
+h1 {
+    font-size: 1.5rem;
+    margin: 0 0 4px;
+}
+
+h2 {
+    font-size: 1.1rem;
+    margin: 0 0 8px;
+}
+
+.muted {
+    color: var(--fg-muted);
+    font-size: 0.9rem;
+}
+
+
+.form {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.field {
+    display: grid;
+    gap: 4px;
+}
+
+.field span {
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+}
+
+input,
+select {
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+    padding: 8px 10px;
+    background: #020617;
+    color: var(--fg-main);
+    font: inherit;
+}
+
+input:focus,
+select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+button {
+    font: inherit;
+}
+
+
+.btn {
+    border-radius: 999px;
+    border: 1px solid transparent;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.btn.primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.45);
+}
+
+.btn.primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 35px rgba(99, 102, 241, 0.65);
+}
+
+.btn.ghost {
+    background: transparent;
+    color: var(--fg-muted);
+    border-color: rgba(148, 163, 184, 0.4);
+}
+
+.btn.ghost:hover {
+    background: rgba(15, 23, 42, 0.85);
+}
+
+.btn.small {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+}
+
+
+.alert {
+    margin-top: 8px;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+}
+
+.alert-error {
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    color: #fecaca;
+}
+
+
+.spinner {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 3px solid rgba(148, 163, 184, 0.3);
+    border-top-color: var(--accent);
+    animation: spin 0.7s linear infinite;
+}
+
+.spinner-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+.app-shell {
+    min-height: 100vh;
+}
+
+.app-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.topbar {
+    height: 56px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px 0 20px;
+    backdrop-filter: blur(12px);
+    background: linear-gradient(to bottom, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.75));
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.brand-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: radial-gradient(circle at 30% 30%, #e0f2fe, #6366f1);
+    box-shadow: 0 0 22px rgba(129, 140, 248, 0.85);
+}
+
+.brand-title {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.topnav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.topnav-link {
+    font-size: 0.9rem;
+    color: var(--fg-muted);
+    text-decoration: none;
+    padding: 6px 10px;
+    border-radius: 999px;
+}
+
+.topnav-link:hover {
+    background: rgba(15, 23, 42, 0.9);
+}
+
+.topnav-link.active {
+    background: var(--accent-soft);
+    color: #e0e7ff;
+}
+
+
+.main-content {
+    padding: 18px 16px 24px;
+}
+
+.page {
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(31, 41, 55, 0.7);
+    text-align: left;
+}
+
+.table th {
+    font-weight: 500;
+    color: var(--fg-muted);
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.18);
+    font-size: 0.8rem;
+}
+
+.badge-admin {
+    background: rgba(129, 140, 248, 0.22);
+    color: #e0e7ff;
+}
+
+.info-block {
+    margin-top: 16px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px dashed rgba(148, 163, 184, 0.6);
+}
+
+.credentials {
+    margin-top: 8px;
+    display: grid;
+    gap: 4px;
+}
+
+.form-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.form-inline input,
+.form-inline select {
+    min-width: 140px;
+}
+
+.table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+
+code {
+    font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.82rem;
+}

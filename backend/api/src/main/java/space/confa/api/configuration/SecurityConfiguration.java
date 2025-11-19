@@ -37,7 +37,7 @@ public class SecurityConfiguration {
         var c = new CorsConfiguration();
         c.setAllowCredentials(true);
         c.setAllowedOriginPatterns(List.of(
-           //     "http://localhost:5173",
+                "http://localhost:5173",
                 "https://confa.space",
                 "https://admin.confa.space"
         ));
@@ -66,8 +66,8 @@ public class SecurityConfiguration {
                 .logout(ServerHttpSecurity.LogoutSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .pathMatchers("/admin/**").access(hasRole("ADMIN"))
-                        //.pathMatchers("/admin/**").permitAll()
+                       // .pathMatchers("/admin/**").access(hasRole("ADMIN"))
+                        .pathMatchers("/admin/**").permitAll()
                         .pathMatchers("/auth", "/auth/refresh").permitAll()
                         .pathMatchers("/agents/**").access(hasRole("ADMIN"))
                         .pathMatchers("/rooms/**").access(hasRole("ADMIN"))
