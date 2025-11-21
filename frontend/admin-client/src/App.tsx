@@ -4,6 +4,7 @@ import { getBootstrapStatus } from './api';
 import BootstrapPage from './pages/BootstrapPage';
 import LoginPage from './pages/LoginPage';
 import UsersPage from './pages/UsersPage';
+import RoomsPage from './pages/RoomsPage';
 import AdminLayout from './components/AdminLayout';
 import { isAuthed } from './auth';
 
@@ -88,6 +89,10 @@ export default function App() {
                     <Route
                         path="/users"
                         element={<RequireAuth><UsersPage /></RequireAuth>}
+                    />
+                    <Route
+                        path="/rooms"
+                        element={<RequireAuth><RoomsPage /></RequireAuth>}
                     />
                 </Route>
 

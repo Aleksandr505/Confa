@@ -12,41 +12,54 @@ import space.confa.api.service.AgentService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/agents")
+@RequestMapping("/rooms/{room}/agents")
 @RequiredArgsConstructor
 public class AgentController {
 
     private final AgentService agentService;
 
     @PostMapping("/invite")
-    public void invite(@RequestBody InviteAgentDto req) {
-        agentService.invite(req.room(), req.requestedBy());
+    public void invite(
+            @PathVariable String room,
+            @RequestBody InviteAgentDto req
+    ) {
+        agentService.invite(room, req.requestedBy());
     }
 
-    @PostMapping("/remove")
-    public void remove(@RequestBody KickAgentDto req) {
-        agentService.kick(req.room(), req.agentIdentity());
+    @PostMapping("/kick")
+    public void remove(
+            @PathVariable String room,
+            @RequestBody KickAgentDto req
+    ) {
+        agentService.kick(room, req.agentIdentity());
     }
 
     @PostMapping("/mute")
-    public void mute(@RequestBody MuteAgentDto req) {
-        agentService.fullMute(req.room(), req.agentSid(), true);
+    public void mute(
+            @PathVariable String room,
+            @RequestBody MuteAgentDto req
+    ) {
+        agentService.fullMute(room, req.agentSid(), true);
     }
 
     @PostMapping("/unmute")
-    public void unmute(@RequestBody MuteAgentDto req) {
-        agentService.fullMute(req.room(), req.agentSid(), false);
+    public void unmute(
+            @PathVariable String room,
+            @RequestBody MuteAgentDto req
+    ) {
+        agentService.fullMute(room, req.agentSid(), false);
     }
 
     @GetMapping
-    public List<AgentInfoDto> getAgentsByRoom(@RequestParam String room) {
+    public List<AgentInfoDto> getAgentsByRoom(@PathVariable String room) {
         return agentService.getAgentsByRoom(room);
     }
 
     @PostMapping("/focus")
     public void focusAgent(
+            @PathVariable String room,
             @RequestBody FocusAgentDto req
     ) {
-        agentService.focusAgent(req.room(), req.activeAgentIdentity(), req.userIdentity());
+        agentService.focusAgent(room, req.activeAgentIdentity(), req.userIdentity());
     }
 }

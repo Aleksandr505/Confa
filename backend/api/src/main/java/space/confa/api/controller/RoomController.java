@@ -1,12 +1,10 @@
 package space.confa.api.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import space.confa.api.model.dto.response.ParticipantInfoDto;
-import space.confa.api.service.AgentService;
+import space.confa.api.model.dto.response.RoomSummaryDto;
+import space.confa.api.service.RoomService;
 
 import java.util.List;
 
@@ -15,10 +13,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RoomController {
 
-    private final AgentService agentService;
+    private final RoomService roomService;
 
-    @GetMapping("/participants")
-    public List<ParticipantInfoDto> getParticipantsByRoom(@RequestParam String room) {
-        return agentService.getParticipantsByRoom(room);
+    @GetMapping
+    public List<RoomSummaryDto> getActiveRooms() {
+        return roomService.getActiveRooms();
+    }
+
+    @GetMapping("/{room}/participants")
+    public List<ParticipantInfoDto> getParticipantsByRoom(@PathVariable String room) {
+        return roomService.getParticipantsByRoom(room);
     }
 }

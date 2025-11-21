@@ -335,6 +335,52 @@ button {
     gap: 6px;
 }
 
+.room-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.room-select-block,
+.room-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.room-select-block select {
+    min-width: 220px;
+}
+
+.label {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+}
+
+.filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.filter-active {
+    background: var(--accent-soft);
+    border-color: rgba(129, 140, 248, 0.9);
+    color: #e0e7ff;
+}
+
+.room-summary {
+    margin-bottom: 10px;
+}
+
+.metadata-cell {
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 
 code {
     font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;

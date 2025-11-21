@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import space.confa.api.model.dto.response.AgentInfoDto;
-import space.confa.api.model.dto.response.ParticipantInfoDto;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -116,28 +115,6 @@ public class AgentService {
           """.formatted(activeAgentIdentity, userIdentity);
             roomClient.updateRoomMetadata(room, metaJson).execute();
 
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    public List<ParticipantInfoDto> getParticipantsByRoom(String room) {
-        try {
-            List<LivekitModels.ParticipantInfo> infos = roomClient.listParticipants(room).execute().body();
-
-            if (infos == null) {
-                return List.of();
-            }
-
-            return infos.stream()
-                    .map(p -> new ParticipantInfoDto(
-                            p.getSid(),
-                            p.getIdentity(),
-                            p.getName(),
-                            p.getKind(),
-                            p.getMetadata()
-                    ))
-                    .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

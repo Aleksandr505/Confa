@@ -24,6 +24,12 @@ export default function AdminLayout() {
                         >
                             Пользователи
                         </NavLink>
+                        <NavLink
+                            to="/rooms"
+                            className={({ isActive }) => isActive ? 'topnav-link active' : 'topnav-link'}
+                        >
+                            Комнаты
+                        </NavLink>
                         <button className="btn ghost small" onClick={logout}>
                             Выйти
                         </button>

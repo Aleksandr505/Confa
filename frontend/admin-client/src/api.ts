@@ -85,3 +85,55 @@ export async function deleteUser(id: string): Promise<void> {
         method: 'DELETE',
     });
 }
+
+
+
+export type RoomSummaryDto = {
+    name: string;
+    numParticipants: number;
+};
+
+export type AgentInfoDto = {
+    sid: string;
+    identity: string;
+    name: string;
+    muted: boolean;
+};
+
+export type ParticipantInfoDto = {
+    sid: string;
+    identity: string;
+    name: string;
+    kind: string;
+    metadata?: string | null;
+};
+
+export type KickAgentDto = {
+    agentIdentity: string;
+};
+
+export async function fetchActiveRooms(): Promise<RoomSummaryDto[]> {
+    return http<RoomSummaryDto[]>('/rooms', {
+        method: 'GET',
+    });
+}
+
+export async function fetchAgentsByRoom(room: string): Promise<AgentInfoDto[]> {
+    return http<AgentInfoDto[]>(`/rooms/${encodeURIComponent(room)}/agents`, {
+        method: 'GET',
+    });
+}
+
+export async function fetchParticipantsByRoom(room: string): Promise<ParticipantInfoDto[]> {
+    return http<ParticipantInfoDto[]>(`/rooms/${encodeURIComponent(room)}/participants`, {
+        method: 'GET',
+    });
+}
+
+export async function kickAgent(room: string, payload: KickAgentDto): Promise<void> {
+    await http<void>(`/rooms/${encodeURIComponent(room)}/agents/kick`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        },
+    );
+}

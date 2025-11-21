@@ -69,10 +69,8 @@ public class SecurityConfiguration {
                        // .pathMatchers("/admin/**").access(hasRole("ADMIN"))
                         .pathMatchers("/admin/**").permitAll()
                         .pathMatchers("/auth", "/auth/refresh").permitAll()
-                        .pathMatchers("/agents/**").access(hasRole("ADMIN"))
-                        .pathMatchers("/rooms/**").access(hasRole("ADMIN"))
-                        // test endpoint
-                        //.pathMatchers("/debug/**").permitAll()
+                        .pathMatchers("/rooms/**").permitAll()
+                        //.pathMatchers("/rooms/**").authenticated()
                         .pathMatchers("/api/livekit/token").authenticated()
                         .anyExchange().authenticated()
                 )
