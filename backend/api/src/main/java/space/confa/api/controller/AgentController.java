@@ -39,15 +39,7 @@ public class AgentController {
             @PathVariable String room,
             @RequestBody MuteAgentDto req
     ) {
-        agentService.fullMute(room, req.agentSid(), true);
-    }
-
-    @PostMapping("/unmute")
-    public void unmute(
-            @PathVariable String room,
-            @RequestBody MuteAgentDto req
-    ) {
-        agentService.fullMute(room, req.agentSid(), false);
+        agentService.fullMute(room, req.agentSid(), req.isMuted());
     }
 
     @GetMapping

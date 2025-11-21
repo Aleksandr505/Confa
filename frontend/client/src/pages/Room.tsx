@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     LiveKitRoom,
@@ -11,7 +11,16 @@ import {
     useRoomContext,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { fetchLivekitToken } from '../api';
+import {
+    fetchLivekitToken,
+    fetchRoomAgents,
+    inviteAgent,
+    kickAgent,
+    muteAgent,
+    focusAgent,
+    type AgentInfoDto,
+    type AgentRole,
+} from '../api';
 import '../styles/livekit-theme.css';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
@@ -40,6 +49,14 @@ export default function RoomPage() {
     const [prejoinError, setPrejoinError] = useState<string>();
     const [permIssue, setPermIssue] = useState<PermIssue | null>(null);
 
+    // --- агенты ---
+    const [agents, setAgents] = useState<AgentInfoDto[]>([]);
+    const [agentsLoading, setAgentsLoading] = useState(false);
+    const [agentsError, setAgentsError] = useState<string | null>(null);
+    const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
+    const [inviteRole, setInviteRole] = useState<AgentRole>('friendly');
+    const [inviteLoading, setInviteLoading] = useState(false);
+
     useEffect(() => {
         if (!ready) return;
         let cancelled = false;
@@ -52,7 +69,9 @@ export default function RoomPage() {
                 if (!cancelled) setPrejoinError(e?.message || 'Token error');
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [ready, roomId, choices?.username]);
 
     const audioProp = useMemo(() => {
@@ -65,6 +84,89 @@ export default function RoomPage() {
         return choices.videoDeviceId ? { deviceId: choices.videoDeviceId } : true;
     }, [choices]);
 
+    const loadAgents = useCallback(
+        async (silent = false) => {
+            if (!roomId) return;
+            if (!silent) setAgentsLoading(true);
+            setAgentsError(null);
+            try {
+                const list = await fetchRoomAgents(roomId);
+                setAgents(list);
+                if (!selectedAgentId && list.length) {
+                    setSelectedAgentId(list[0].identity);
+                } else if (
+                    selectedAgentId &&
+                    !list.some(a => a.identity === selectedAgentId)
+                ) {
+                    setSelectedAgentId(list[0]?.identity);
+                }
+            } catch (e: any) {
+                setAgentsError(e?.message || 'Не удалось загрузить агентов');
+            } finally {
+                if (!silent) setAgentsLoading(false);
+            }
+        },
+        [roomId, selectedAgentId],
+    );
+
+    useEffect(() => {
+        if (!ready || !roomId) return;
+        const id = setInterval(() => {
+            loadAgents(true);
+        }, 5000);
+        return () => clearInterval(id);
+    }, [ready, roomId, loadAgents]);
+
+    useEffect(() => {
+        if (!ready) return;
+        loadAgents(true);
+    }, [ready, roomId, loadAgents]);
+
+    async function handleInvite(role: AgentRole) {
+        if (!roomId) return;
+        setInviteLoading(true);
+        try {
+            await inviteAgent(roomId, role);
+            await loadAgents();
+        } catch (e: any) {
+            alert(e?.message || 'Не удалось пригласить агента');
+        } finally {
+            setInviteLoading(false);
+        }
+    }
+
+    async function handleKick() {
+        if (!roomId || !selectedAgentId) return;
+        if (!confirm(`Выгнать агента ${selectedAgentId} из комнаты ${roomId}?`)) return;
+        try {
+            await kickAgent(roomId, { agentIdentity: selectedAgentId });
+            await loadAgents();
+        } catch (e: any) {
+            alert(e?.message || 'Не удалось выгнать агента');
+        }
+    }
+
+    async function handleToggleMute() {
+        if (!roomId || !selectedAgentId) return;
+        const agent = agents.find(a => a.identity === selectedAgentId);
+        if (!agent) return;
+        try {
+            await muteAgent(roomId, agent.identity, !agent.muted);
+            await loadAgents();
+        } catch (e: any) {
+            alert(e?.message || 'Не удалось изменить mute для агента');
+        }
+    }
+
+    async function handleFocus() {
+        if (!roomId || !selectedAgentId) return;
+        try {
+            await focusAgent(roomId, selectedAgentId);
+            alert('Агенту отправлен сигнал сфокусироваться на вас');
+        } catch (e: any) {
+            alert(e?.message || 'Не удалось сфокусировать агента');
+        }
+    }
 
     if (!ready) {
         return (
@@ -73,15 +175,11 @@ export default function RoomPage() {
                     <header className="lk-appbar light">
                         <div className="brand">
                             <span className="brand-dot" />
-                            <span className="brand-title">Room: {roomId}</span>
+                            <span className="brand-title">Комната: {roomId}</span>
                         </div>
                     </header>
                     <main className="prejoin-main">
-                        {prejoinError && (
-                            <div className="soft-alert">
-                                {prejoinError}
-                            </div>
-                        )}
+                        {prejoinError && <div className="soft-alert">{prejoinError}</div>}
                         <PreJoin
                             persistUserChoices
                             joinLabel="Войти в комнату"
@@ -98,7 +196,7 @@ export default function RoomPage() {
                                 });
                                 setReady(true);
                             }}
-                            onError={(e) => {
+                            onError={e => {
                                 setPrejoinError(e?.message || 'Permission or device error');
                             }}
                         />
@@ -122,6 +220,8 @@ export default function RoomPage() {
             </div>
         );
     }
+
+    const selectedAgent = agents.find(a => a.identity === selectedAgentId);
 
     return (
         <div className="lk-root gradient-bg">
@@ -148,17 +248,107 @@ export default function RoomPage() {
                     });
                     console.warn('Media device failure', failure, kind);
                 }}
-                onError={(e) => {
+                onError={e => {
                     console.error(e);
                 }}
             >
                 <header className="lk-appbar">
                     <div className="brand">
                         <span className="brand-dot" />
-                        <span className="brand-title">Room: {roomId}</span>
+                        <span className="brand-title">Комната: {roomId}</span>
                     </div>
                     <RoomPermissionHint />
                 </header>
+
+                {}
+                <div className="agent-bar">
+                    <div className="agent-section">
+                        <span className="agent-label">Пригласить агента</span>
+                        <div className="agent-invite">
+                            <select
+                                value={inviteRole}
+                                onChange={e => setInviteRole(e.target.value as AgentRole)}
+                            >
+                                <option value="friendly">friendly</option>
+                                <option value="funny">funny</option>
+                                <option value="bored">bored</option>
+                            </select>
+                            <button
+                                className="btn small"
+                                type="button"
+                                onClick={() => handleInvite(inviteRole)}
+                                disabled={inviteLoading}
+                            >
+                                {inviteLoading ? 'Приглашаем…' : 'Пригласить'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="agent-section">
+                        <span className="agent-label">Управление агентами</span>
+                        <div className="agent-actions">
+                            <select
+                                value={selectedAgentId ?? ''}
+                                onChange={e => setSelectedAgentId(e.target.value || undefined)}
+                            >
+                                {agents.length === 0 && <option value="">Агентов нет</option>}
+                                {agents.map(a => (
+                                    <option key={a.identity} value={a.identity}>
+                                        {a.name || a.identity} {a.muted ? '· muted' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                className="btn ghost small"
+                                type="button"
+                                disabled={!selectedAgentId}
+                                onClick={handleToggleMute}
+                            >
+                                {selectedAgent?.muted ? 'Unmute' : 'Mute'}
+                            </button>
+                            <button
+                                className="btn ghost small"
+                                type="button"
+                                disabled={!selectedAgentId}
+                                onClick={handleFocus}
+                            >
+                                Фокус на мне
+                            </button>
+                            <button
+                                className="btn ghost small"
+                                type="button"
+                                disabled={!selectedAgentId}
+                                onClick={handleKick}
+                            >
+                                Выгнать
+                            </button>
+                        </div>
+                        {selectedAgent && (
+                            <div className="agent-status">
+                <span
+                    className={
+                        'agent-dot ' + (selectedAgent.muted ? 'muted' : '')
+                    }
+                />
+                                <span>
+                  {selectedAgent.muted
+                      ? 'Агент сейчас заглушён'
+                      : 'Агент может говорить и слушать комнату'}
+                </span>
+                            </div>
+                        )}
+                        {agentsLoading && (
+                            <div className="agent-status">
+                                <span>Обновляем список агентов…</span>
+                            </div>
+                        )}
+                        {agentsError && (
+                            <div className="agent-status" style={{ color: '#fecaca' }}>
+                                {agentsError}
+                            </div>
+                        )}
+                    </div>
+                </div>
 
                 <PermissionBanner issue={permIssue} clearIssue={() => setPermIssue(null)} />
 
@@ -181,19 +371,27 @@ function RoomPermissionHint() {
     return <div className="perm-hint">Токен без прав на микрофон/камеру</div>;
 }
 
-function PermissionBanner({ issue, clearIssue }: { issue: PermIssue | null; clearIssue: () => void }) {
+function PermissionBanner({
+                              issue,
+                              clearIssue,
+                          }: {
+    issue: PermIssue | null;
+    clearIssue: () => void;
+}) {
     const room = useRoomContext();
     if (!issue) return null;
 
     const ask = async (what: 'mic' | 'cam' | 'both') => {
         try {
             const constraints =
-                what === 'mic' ? { audio: true, video: false } :
-                    what === 'cam' ? { audio: false, video: true } :
-                        { audio: true, video: true };
+                what === 'mic'
+                    ? { audio: true, video: false }
+                    : what === 'cam'
+                        ? { audio: false, video: true }
+                        : { audio: true, video: true };
 
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            stream.getTracks().forEach(t => t.stop()); // чистим временные треки
+            stream.getTracks().forEach(t => t.stop());
             clearIssue();
 
             if (what !== 'cam') await room.localParticipant.setMicrophoneEnabled(true);
@@ -201,7 +399,7 @@ function PermissionBanner({ issue, clearIssue }: { issue: PermIssue | null; clea
         } catch (e: any) {
             console.warn('Re-request media failed', e);
             alert(
-                'Доступ всё ещё заблокирован. Откройте настройки сайта (иконка камеры/микрофона рядом с адресной строкой) и разрешите доступ, затем попробуйте снова.'
+                'Доступ всё ещё заблокирован. Откройте настройки сайта (иконка камеры/микрофона рядом с адресной строкой) и разрешите доступ, затем попробуйте снова.',
             );
         }
     };
@@ -210,19 +408,29 @@ function PermissionBanner({ issue, clearIssue }: { issue: PermIssue | null; clea
         <div className="perm-banner">
             <div className="perm-text">
                 {issue.message || 'Доступ к устройствам заблокирован.'}{' '}
-                <span className="perm-help">Можно запросить снова — без перезагрузки страницы.</span>
+                <span className="perm-help">
+          Можно запросить снова — без перезагрузки страницы.
+        </span>
             </div>
             <div className="perm-actions">
                 {issue.microphone && (
-                    <button className="btn small" onClick={() => ask('mic')}>Запросить микрофон</button>
+                    <button className="btn small" onClick={() => ask('mic')}>
+                        Запросить микрофон
+                    </button>
                 )}
                 {issue.camera && (
-                    <button className="btn small" onClick={() => ask('cam')}>Запросить камеру</button>
+                    <button className="btn small" onClick={() => ask('cam')}>
+                        Запросить камеру
+                    </button>
                 )}
                 {!issue.camera && !issue.microphone && (
-                    <button className="btn small" onClick={() => ask('both')}>Запросить доступ</button>
+                    <button className="btn small" onClick={() => ask('both')}>
+                        Запросить доступ
+                    </button>
                 )}
-                <button className="btn ghost small" onClick={clearIssue}>Скрыть</button>
+                <button className="btn ghost small" onClick={clearIssue}>
+                    Скрыть
+                </button>
             </div>
         </div>
     );

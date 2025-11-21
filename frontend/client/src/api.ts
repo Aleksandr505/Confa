@@ -24,4 +24,60 @@ export async function fetchLivekitToken(room?: string, displayName?: string) {
     return data.token;
 }
 
+export type AgentRole = 'bored' | 'friendly' | 'funny';
+
+export type AgentInfoDto = {
+    sid: string;
+    identity: string;
+    name: string;
+    muted: boolean;
+};
+
+export type KickAgentDto = {
+    agentIdentity: string;
+};
+
+export async function fetchRoomAgents(room: string): Promise<AgentInfoDto[]> {
+    return http<AgentInfoDto[]>(`/rooms/${encodeURIComponent(room)}/agents`, {
+        method: 'GET',
+    });
+}
+
+export async function inviteAgent(room: string, role: AgentRole): Promise<void> {
+    await http<void>(`/rooms/${encodeURIComponent(room)}/agents/invite`, {
+        method: 'POST',
+        body: JSON.stringify({ role }),
+    });
+}
+
+export async function kickAgent(room: string, payload: KickAgentDto): Promise<void> {
+    await http<void>(`/rooms/${encodeURIComponent(room)}/agents/kick`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        },
+    );
+}
+
+export async function muteAgent(
+    room: string,
+    identity: string,
+    muted: boolean,
+): Promise<void> {
+    await http<void>(
+        `/rooms/${encodeURIComponent(room)}/agents/mute`,
+        {
+            method: 'POST',
+            body: JSON.stringify({ identity, muted }),
+        },
+    );
+}
+
+export async function focusAgent(room: string, identity: string): Promise<void> {
+    await http<void>(
+        `/rooms/${encodeURIComponent(room)}/agents/focus`,
+        { method: 'POST' },
+    );
+}
+
+
 loadTokensFromSession();

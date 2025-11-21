@@ -1,0 +1,118 @@
+:root {
+    --client-bg: #020617;
+    --client-card-bg: rgba(15, 23, 42, 0.92);
+    --client-border: rgba(148, 163, 184, 0.35);
+    --client-accent: #0ea5e9;
+    --client-accent-soft: rgba(56, 189, 248, 0.18);
+    --client-fg: #e5e7eb;
+    --client-muted: #94a3b8;
+    --client-danger: #f97373;
+    --client-radius: 16px;
+    --client-shadow: 0 18px 55px rgba(15, 23, 42, 0.85);
+    --client-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.auth-root {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background:
+            radial-gradient(1200px 600px at 0% -10%, rgba(14, 165, 233, 0.25), transparent 55%),
+            radial-gradient(900px 500px at 100% 110%, rgba(236, 72, 153, 0.22), transparent 55%),
+            #020617;
+    font-family: var(--client-font);
+}
+
+.auth-root.client-theme {
+}
+
+.auth-card {
+    width: min(420px, 100%);
+    background: var(--client-card-bg);
+    border-radius: var(--client-radius);
+    border: 1px solid var(--client-border);
+    box-shadow: var(--client-shadow);
+    padding: 24px 22px 22px;
+    color: var(--client-fg);
+}
+
+.auth-title {
+    margin: 0 0 4px;
+    font-size: 1.6rem;
+    font-weight: 600;
+}
+
+.auth-subtitle {
+    margin: 0 0 16px;
+    font-size: 0.95rem;
+    color: var(--client-muted);
+}
+
+.auth-form {
+    display: grid;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.field {
+    display: grid;
+    gap: 4px;
+}
+
+.field span {
+    font-size: 0.8rem;
+    color: var(--client-muted);
+}
+
+.auth-form input {
+    border-radius: 999px;
+    border: 1px solid var(--client-border);
+    padding: 8px 12px;
+    background: rgba(15, 23, 42, 0.95);
+    color: var(--client-fg);
+    font: inherit;
+}
+
+.auth-form input:focus {
+    outline: 2px solid var(--client-accent);
+    outline-offset: 1px;
+}
+
+.btn {
+    border-radius: 999px;
+    border: 1px solid transparent;
+    padding: 8px 16px;
+    font: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.btn.primary {
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    color: #f9fafb;
+    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.6);
+}
+
+.btn.primary:hover {
+    transform: translateY(-0.5px);
+    box-shadow: 0 16px 40px rgba(59, 130, 246, 0.75);
+}
+
+.alert {
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+}
+
+.alert-error {
+    background: rgba(248, 113, 113, 0.13);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    color: #fee2e2;
+}

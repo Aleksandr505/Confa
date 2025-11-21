@@ -53,7 +53,19 @@ export async function http<T>(path: string, init: RequestInit = {}): Promise<T> 
         });
     }
 
-    if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
-    if (resp.status === 204) return undefined as T;
-    return (await resp.json()) as T;
+    if (!resp.ok) {
+        throw new Error(`${resp.status} ${resp.statusText}`);
+    }
+
+    const raw = await resp.text();
+
+    if (!raw || !raw.trim()) {
+        return undefined as T;
+    }
+
+    try {
+        return JSON.parse(raw) as T;
+    } catch (e) {
+        throw new Error('Failed to parse JSON response');
+    }
 }
