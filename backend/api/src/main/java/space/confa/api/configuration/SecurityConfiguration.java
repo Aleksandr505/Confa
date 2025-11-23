@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -20,7 +21,6 @@ import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import reactor.core.publisher.Mono;
 import space.confa.api.model.domain.AppHttpHeader;
-import space.confa.api.security.JwtGrantedAuthoritiesConverter;
 
 import java.util.List;
 
@@ -69,21 +69,26 @@ public class SecurityConfiguration {
                        // .pathMatchers("/admin/**").access(hasRole("ADMIN"))
                         .pathMatchers("/admin/**").permitAll()
                         .pathMatchers("/auth", "/auth/refresh").permitAll()
-                        .pathMatchers("/rooms/**").permitAll()
+                        .pathMatchers("/rooms/**").hasRole("ADMIN")
                         //.pathMatchers("/rooms/**").authenticated()
                         .pathMatchers("/api/livekit/token").authenticated()
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwtSpec -> jwtSpec.jwtAuthenticationConverter(grantedAuthoritiesExtractor()))
+                        .jwt(jwtSpec -> jwtSpec.jwtAuthenticationConverter(jwtAuthConverter()))
                 );
 
         return http.build();
     }
 
-    private Converter<Jwt, Mono<AbstractAuthenticationToken>> grantedAuthoritiesExtractor() {
+    @Bean
+    public Converter<Jwt, Mono<AbstractAuthenticationToken>> jwtAuthConverter() {
+        var roles = new JwtGrantedAuthoritiesConverter();
+        roles.setAuthorityPrefix("ROLE_");
+        roles.setAuthoritiesClaimName("scope");
+
         var jwtConverter = new JwtAuthenticationConverter();
-        jwtConverter.setJwtGrantedAuthoritiesConverter(new JwtGrantedAuthoritiesConverter());
+        jwtConverter.setJwtGrantedAuthoritiesConverter(roles);
 
         return new ReactiveJwtAuthenticationConverterAdapter(jwtConverter);
     }

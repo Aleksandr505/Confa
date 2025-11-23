@@ -3,7 +3,9 @@ package space.confa.api.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import space.confa.api.model.dto.response.ParticipantInfoDto;
+import space.confa.api.model.dto.response.RoomMetadataDto;
 import space.confa.api.model.dto.response.RoomSummaryDto;
+import space.confa.api.service.RoomMetadataService;
 import space.confa.api.service.RoomService;
 
 import java.util.List;
@@ -14,6 +16,7 @@ import java.util.List;
 public class RoomController {
 
     private final RoomService roomService;
+    private final RoomMetadataService roomMetadataService;
 
     @GetMapping
     public List<RoomSummaryDto> getActiveRooms() {
@@ -23,5 +26,10 @@ public class RoomController {
     @GetMapping("/{room}/participants")
     public List<ParticipantInfoDto> getParticipantsByRoom(@PathVariable String room) {
         return roomService.getParticipantsByRoom(room);
+    }
+
+    @GetMapping("/{room}/config")
+    public RoomMetadataDto getRoomConfig(@PathVariable String room) {
+        return roomMetadataService.getRoomMetadata(room);
     }
 }

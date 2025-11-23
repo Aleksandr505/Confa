@@ -5,7 +5,9 @@ import io.livekit.server.RoomServiceClient;
 import livekit.LivekitModels;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import space.confa.api.model.dto.response.AgentInfoDto;
 
 import java.io.IOException;
@@ -21,7 +23,17 @@ public class AgentService {
     private final RoomServiceClient roomClient;
     private final AgentDispatchServiceClient agentDispatchClient;
 
+    private final RoomMetadataService roomMetadataService;
+
     public void invite(String room, String by) {
+        var meta = roomMetadataService.getRoomMetadata(room);
+        if (!meta.isAgentsEnabled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Agent feature is disabled in this room"
+            );
+        }
+
         try {
             var dispatch = agentDispatchClient.createDispatch(
                     room,

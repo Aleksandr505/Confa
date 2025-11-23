@@ -1,14 +1,19 @@
 package space.confa.api.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 import space.confa.api.model.dto.request.FocusAgentDto;
 import space.confa.api.model.dto.request.InviteAgentDto;
 import space.confa.api.model.dto.request.KickAgentDto;
 import space.confa.api.model.dto.request.MuteAgentDto;
 import space.confa.api.model.dto.response.AgentInfoDto;
 import space.confa.api.service.AgentService;
+import space.confa.api.service.RoomMetadataService;
+import space.confa.api.service.RoomService;
 
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -17,6 +22,25 @@ import java.util.List;
 public class AgentController {
 
     private final AgentService agentService;
+    private final RoomMetadataService roomMetadataService;
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/enable")
+    public Mono<Void> enableAgents(
+            @PathVariable String room,
+            Principal principal
+    ) {
+        return Mono.fromRunnable(() -> roomMetadataService.enableAgents(room, principal.getName()));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/disable")
+    public Mono<Void> disableAgents(
+            @PathVariable String room,
+            Principal principal
+    ) {
+        return Mono.fromRunnable(() -> roomMetadataService.disableAgents(room, principal.getName()));
+    }
 
     @PostMapping("/invite")
     public void invite(

@@ -79,5 +79,30 @@ export async function focusAgent(room: string, identity: string): Promise<void> 
     );
 }
 
+export type RoomMetadata = {
+    isAgentsEnabled: boolean;
+    maxAgents?: number;
+    enabledBy?: string | null;
+    enabledAt?: string | null;
+};
+
+export async function fetchRoomMetadata(room: string): Promise<RoomMetadata> {
+    return http<RoomMetadata>(`/rooms/${encodeURIComponent(room)}/config`, {
+        method: 'GET',
+    });
+}
+
+export async function enableRoomAgents(room: string): Promise<void> {
+    await http<void>(`/rooms/${encodeURIComponent(room)}/agents/enable`, {
+        method: 'POST',
+    });
+}
+
+export async function disableRoomAgents(room: string): Promise<void> {
+    await http<void>(`/rooms/${encodeURIComponent(room)}/agents/disable`, {
+        method: 'POST',
+    });
+}
+
 
 loadTokensFromSession();

@@ -19,9 +19,10 @@ import {
     muteAgent,
     focusAgent,
     type AgentInfoDto,
-    type AgentRole,
+    type AgentRole, type RoomMetadata, fetchRoomMetadata, enableRoomAgents, disableRoomAgents,
 } from '../api';
 import '../styles/livekit-theme.css';
+import {isAdmin} from "../lib/auth.ts";
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 
@@ -49,13 +50,35 @@ export default function RoomPage() {
     const [prejoinError, setPrejoinError] = useState<string>();
     const [permIssue, setPermIssue] = useState<PermIssue | null>(null);
 
-    // --- агенты ---
     const [agents, setAgents] = useState<AgentInfoDto[]>([]);
     const [agentsLoading, setAgentsLoading] = useState(false);
     const [agentsError, setAgentsError] = useState<string | null>(null);
     const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>();
     const [inviteRole, setInviteRole] = useState<AgentRole>('friendly');
     const [inviteLoading, setInviteLoading] = useState(false);
+
+    const [roomConfig, setRoomConfig] = useState<RoomMetadata | null>(null);
+    const [roomConfigLoading, setRoomConfigLoading] = useState(false);
+    const [roomConfigError, setRoomConfigError] = useState<string | null>(null);
+
+    const isAdminUser = isAdmin();
+
+    const agentsFeatureEnabled = roomConfig?.isAgentsEnabled === true;
+
+    useEffect(() => {
+        if (!ready || !roomId) return;
+
+        setRoomConfigLoading(true);
+        setRoomConfigError(null);
+
+        fetchRoomMetadata(roomId)
+            .then(cfg => setRoomConfig(cfg))
+            .catch(e => {
+                console.warn('Failed to load room config', e);
+                setRoomConfigError(e?.message || 'Не удалось получить конфиг комнаты');
+            })
+            .finally(() => setRoomConfigLoading(false));
+    }, [ready, roomId]);
 
     useEffect(() => {
         if (!ready) return;
@@ -121,6 +144,31 @@ export default function RoomPage() {
         if (!ready) return;
         loadAgents(true);
     }, [ready, roomId, loadAgents]);
+
+    async function handleEnableAgents() {
+        if (!roomId) return;
+        try {
+            await enableRoomAgents(roomId);
+            const cfg = await fetchRoomMetadata(roomId);
+            setRoomConfig(cfg);
+        } catch (e: any) {
+            alert(e?.message || 'Не удалось включить агентов');
+        }
+    }
+
+    async function handleDisableAgents() {
+        if (!roomId) return;
+        if (!confirm('Отключить агентов в этой комнате? Все приглашения станут недоступны.')) {
+            return;
+        }
+        try {
+            await disableRoomAgents(roomId);
+            const cfg = await fetchRoomMetadata(roomId);
+            setRoomConfig(cfg);
+        } catch (e: any) {
+            alert(e?.message || 'Не удалось отключить агентов');
+        }
+    }
 
     async function handleInvite(role: AgentRole) {
         if (!roomId) return;
@@ -260,95 +308,137 @@ export default function RoomPage() {
                     <RoomPermissionHint />
                 </header>
 
-                {}
-                <div className="agent-bar">
-                    <div className="agent-section">
-                        <span className="agent-label">Пригласить агента</span>
-                        <div className="agent-invite">
-                            <select
-                                value={inviteRole}
-                                onChange={e => setInviteRole(e.target.value as AgentRole)}
-                            >
-                                <option value="friendly">friendly</option>
-                                <option value="funny">funny</option>
-                                <option value="bored">bored</option>
-                            </select>
-                            <button
-                                className="btn small"
-                                type="button"
-                                onClick={() => handleInvite(inviteRole)}
-                                disabled={inviteLoading}
-                            >
-                                {inviteLoading ? 'Приглашаем…' : 'Пригласить'}
-                            </button>
+                {agentsFeatureEnabled ? (
+                    <div className="agent-bar">
+                        <div className="agent-section">
+                            <span className="agent-label">Пригласить агента</span>
+                            <div className="agent-invite">
+                                <select
+                                    value={inviteRole}
+                                    onChange={e => setInviteRole(e.target.value as AgentRole)}
+                                >
+                                    <option value="friendly">friendly</option>
+                                    <option value="funny">funny</option>
+                                    <option value="bored">bored</option>
+                                </select>
+                                <button
+                                    className="btn small"
+                                    type="button"
+                                    onClick={() => handleInvite(inviteRole)}
+                                    disabled={inviteLoading}
+                                >
+                                    {inviteLoading ? 'Приглашаем…' : 'Пригласить'}
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="agent-section">
-                        <span className="agent-label">Управление агентами</span>
-                        <div className="agent-actions">
-                            <select
-                                value={selectedAgentId ?? ''}
-                                onChange={e => setSelectedAgentId(e.target.value || undefined)}
-                            >
-                                {agents.length === 0 && <option value="">Агентов нет</option>}
-                                {agents.map(a => (
-                                    <option key={a.identity} value={a.identity}>
-                                        {a.name || a.identity} {a.muted ? '· muted' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                            <button
-                                className="btn ghost small"
-                                type="button"
-                                disabled={!selectedAgentId}
-                                onClick={handleToggleMute}
-                            >
-                                {selectedAgent?.muted ? 'Unmute' : 'Mute'}
-                            </button>
-                            <button
-                                className="btn ghost small"
-                                type="button"
-                                disabled={!selectedAgentId}
-                                onClick={handleFocus}
-                            >
-                                Фокус на мне
-                            </button>
-                            <button
-                                className="btn ghost small"
-                                type="button"
-                                disabled={!selectedAgentId}
-                                onClick={handleKick}
-                            >
-                                Выгнать
-                            </button>
+                        <div className="agent-section">
+                            <span className="agent-label">Управление агентами</span>
+                            <div className="agent-actions">
+                                <select
+                                    value={selectedAgentId ?? ''}
+                                    onChange={e => setSelectedAgentId(e.target.value || undefined)}
+                                >
+                                    {agents.length === 0 && <option value="">Агентов нет</option>}
+                                    {agents.map(a => (
+                                        <option key={a.identity} value={a.identity}>
+                                            {a.name || a.identity} {a.muted ? '· muted' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    className="btn ghost small"
+                                    type="button"
+                                    disabled={!selectedAgentId}
+                                    onClick={handleToggleMute}
+                                >
+                                    {selectedAgent?.muted ? 'Unmute' : 'Mute'}
+                                </button>
+                                <button
+                                    className="btn ghost small"
+                                    type="button"
+                                    disabled={!selectedAgentId}
+                                    onClick={handleFocus}
+                                >
+                                    Фокус на мне
+                                </button>
+                                <button
+                                    className="btn ghost small"
+                                    type="button"
+                                    disabled={!selectedAgentId}
+                                    onClick={handleKick}
+                                >
+                                    Выгнать
+                                </button>
+
+                                {}
+                                {isAdminUser && (
+                                    <button
+                                        className="btn ghost small"
+                                        type="button"
+                                        onClick={handleDisableAgents}
+                                    >
+                                        Отключить агентов
+                                    </button>
+                                )}
+                            </div>
+
+                            {selectedAgent && (
+                                <div className="agent-status">
+                                    <span
+                                        className={'agent-dot ' + (selectedAgent.muted ? 'muted' : '')}
+                                    />
+                                    <span>
+                                        {selectedAgent.muted
+                                            ? 'Агент сейчас заглушён'
+                                            : 'Агент может говорить и слушать комнату'}
+                                    </span>
+                                </div>
+                            )}
+                            {agentsLoading && (
+                                <div className="agent-status">
+                                    <span>Обновляем список агентов…</span>
+                                </div>
+                            )}
+                            {agentsError && (
+                                <div className="agent-status" style={{ color: '#fecaca' }}>
+                                    {agentsError}
+                                </div>
+                            )}
                         </div>
-                        {selectedAgent && (
-                            <div className="agent-status">
-                <span
-                    className={
-                        'agent-dot ' + (selectedAgent.muted ? 'muted' : '')
-                    }
-                />
-                                <span>
-                  {selectedAgent.muted
-                      ? 'Агент сейчас заглушён'
-                      : 'Агент может говорить и слушать комнату'}
-                </span>
-                            </div>
-                        )}
-                        {agentsLoading && (
-                            <div className="agent-status">
-                                <span>Обновляем список агентов…</span>
-                            </div>
-                        )}
-                        {agentsError && (
-                            <div className="agent-status" style={{ color: '#fecaca' }}>
-                                {agentsError}
-                            </div>
-                        )}
                     </div>
-                </div>
+                ) : (
+                    <div className="agent-bar">
+                        <div className="agent-section">
+                            <span className="agent-label">Агенты в этой комнате</span>
+                            <div className="agent-actions">
+                                <span className="agent-status">
+                                    <span className="agent-dot muted"/>
+                                    <span>Функционал агентов отключён.</span>
+                                </span>
+
+                                {isAdminUser && !roomConfigLoading && (
+                                    <button
+                                        className="btn small"
+                                        type="button"
+                                        onClick={handleEnableAgents}
+                                    >
+                                        Включить агентов в комнате
+                                    </button>
+                                )}
+                                {roomConfigLoading && (
+                                    <span className="agent-status">Загружаем конфиг комнаты…</span>
+                                )}
+                                {roomConfigError && (
+                                    <span className="agent-status" style={{color: '#fecaca'}}>
+                                        {roomConfigError}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
 
                 <PermissionBanner issue={permIssue} clearIssue={() => setPermIssue(null)} />
 
