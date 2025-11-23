@@ -1,18 +1,16 @@
 package space.confa.api.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.livekit.server.RoomServiceClient;
-import livekit.LivekitModels;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import space.confa.api.model.dto.response.RoomMetadataDto;
+import space.confa.api.service.parser.MetadataParser;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -20,24 +18,18 @@ public class RoomMetadataService {
 
     private final RoomServiceClient roomClient;
     private final ObjectMapper objectMapper;
+    private final MetadataParser metadataParser;
 
     public RoomMetadataDto getRoomMetadata(String room) {
         try {
             var rooms = roomClient.listRooms(List.of(room)).execute().body();
             if (rooms == null || rooms.isEmpty()) {
-                return new RoomMetadataDto(false, null, null, 1);
+                return RoomMetadataDto.builder()
+                        .isAgentsEnabled(false)
+                        .build();
             }
 
-            return Optional.ofNullable(rooms.getFirst())
-                    .map(LivekitModels.Room::getMetadata)
-                    .map(meta -> {
-                        try {
-                            return objectMapper.readValue(meta, RoomMetadataDto.class);
-                        } catch (JsonProcessingException e) {
-                            return null;
-                        }
-                    })
-                    .orElse(new RoomMetadataDto(false, null, null, 1));
+            return metadataParser.parseRoomMeta(rooms.getFirst().getMetadata());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

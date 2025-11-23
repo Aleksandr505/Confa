@@ -43,10 +43,10 @@ export async function fetchRoomAgents(room: string): Promise<AgentInfoDto[]> {
     });
 }
 
-export async function inviteAgent(room: string, role: AgentRole): Promise<void> {
+export async function inviteAgent(room: string, agentRole: AgentRole): Promise<void> {
     await http<void>(`/rooms/${encodeURIComponent(room)}/agents/invite`, {
         method: 'POST',
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ agentRole }),
     });
 }
 
@@ -60,14 +60,14 @@ export async function kickAgent(room: string, payload: KickAgentDto): Promise<vo
 
 export async function muteAgent(
     room: string,
-    identity: string,
-    muted: boolean,
+    agentSid: string,
+    isMuted: boolean,
 ): Promise<void> {
     await http<void>(
         `/rooms/${encodeURIComponent(room)}/agents/mute`,
         {
             method: 'POST',
-            body: JSON.stringify({ identity, muted }),
+            body: JSON.stringify({ agentSid, isMuted }),
         },
     );
 }

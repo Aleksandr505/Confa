@@ -9,6 +9,7 @@ import * as deepgram from '@livekit/agents-plugin-deepgram';
 
 import { getAgentConfig, type AgentRole } from './configuration/config.js';
 import { ConfigurableAgent } from './configuration/configurableAgent.js';
+import {Room} from "@livekit/rtc-node";
 
 
 dotenv.config({ path: '.env.local' });
@@ -174,7 +175,33 @@ export default defineAgent({
                 }
             }
 
+            await updateSelfMetadata(ctx.room, { isMuted: assistant.hardMuted });
+
             console.log(`[Agent] hardMuted=${assistant.hardMuted}`);
+        }
+
+        type AgentMeta = {
+            isMuted: boolean;
+            invitedBy?: string;
+        };
+
+        function parseAgentMeta(raw: string | undefined): AgentMeta {
+            if (!raw) return { isMuted: false };
+            try {
+                return JSON.parse(raw) as AgentMeta;
+            } catch {
+                return { isMuted: false };
+            }
+        }
+
+        async function updateSelfMetadata(room: Room, patch: Partial<AgentMeta>) {
+            const lp = room.localParticipant;
+            const current = parseAgentMeta(lp?.metadata);
+            const next: AgentMeta = { ...current, ...patch };
+
+            const json = JSON.stringify(next);
+            await lp?.updateMetadata(json);
+            console.log('[Agent] updated self metadata:', json);
         }
 
         ctx.room.on('dataReceived', async (payload, participant, kind) => {

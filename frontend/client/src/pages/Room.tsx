@@ -199,7 +199,7 @@ export default function RoomPage() {
         const agent = agents.find(a => a.identity === selectedAgentId);
         if (!agent) return;
         try {
-            await muteAgent(roomId, agent.identity, !agent.muted);
+            await muteAgent(roomId, agent.sid, !agent.muted);
             await loadAgents();
         } catch (e: any) {
             alert(e?.message || 'Не удалось изменить mute для агента');

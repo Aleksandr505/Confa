@@ -43,11 +43,12 @@ public class AgentController {
     }
 
     @PostMapping("/invite")
-    public void invite(
+    public Mono<Void> invite(
             @PathVariable String room,
-            @RequestBody InviteAgentDto req
+            @RequestBody InviteAgentDto req,
+            Principal principal
     ) {
-        agentService.invite(room, req.requestedBy());
+        return Mono.fromRunnable(() -> agentService.invite(room, req.agentRole()));
     }
 
     @PostMapping("/kick")

@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import space.confa.api.model.dto.response.AgentInfoDto;
+import space.confa.api.model.dto.response.AgentParticipantMetaDto;
+import space.confa.api.service.parser.MetadataParser;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -24,10 +26,11 @@ public class AgentService {
     private final AgentDispatchServiceClient agentDispatchClient;
 
     private final RoomMetadataService roomMetadataService;
+    private final MetadataParser metadataParser;
 
-    public void invite(String room, String by) {
+    public void invite(String room, String agentRole) {
         var meta = roomMetadataService.getRoomMetadata(room);
-        if (!meta.isAgentsEnabled()) {
+        if (!Boolean.TRUE.equals(meta.isAgentsEnabled())) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Agent feature is disabled in this room"
@@ -35,14 +38,8 @@ public class AgentService {
         }
 
         try {
-            var dispatch = agentDispatchClient.createDispatch(
-                    room,
-                    "Agent",
-                    "{\"agentEnabled\":true,\"agentRequestedBy\":\""+by+"\"}").execute().body();
-            log.info("Agent invited to room " + dispatch);
-
-            var list = agentDispatchClient.listDispatch(room).execute().body();
-            log.info("Dispatch list: " + list);
+            agentDispatchClient.createDispatch(room, "Agent", "{\"role\":\""+agentRole+"\"}")
+                    .execute();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -77,14 +74,12 @@ public class AgentService {
             return infos.stream()
                     .filter(p -> p.getIdentity().startsWith("agent-"))
                     .map(p -> {
-                        boolean audioMuted = p.getTracksList().stream()
-                                .filter(t -> t.getType() == LivekitModels.TrackType.AUDIO)
-                                .allMatch(LivekitModels.TrackInfo::getMuted);
+                        AgentParticipantMetaDto meta = metadataParser.parseAgentParticipantMeta(p.getMetadata());
                         return new AgentInfoDto(
                                 p.getSid(),
                                 p.getIdentity(),
                                 p.getName(),
-                                audioMuted
+                                meta.isMuted()
                         );
                     })
                     .toList();
@@ -119,13 +114,13 @@ public class AgentService {
                     .execute();
 
 
-            String metaJson = """
+           /* String metaJson = """
           {
             "activeAgentIdentity":"%s",
             "agentListeningUser":"%s"
           }
           """.formatted(activeAgentIdentity, userIdentity);
-            roomClient.updateRoomMetadata(room, metaJson).execute();
+            roomClient.updateRoomMetadata(room, metaJson).execute();*/
 
         } catch (IOException e) {
             throw new UncheckedIOException(e);
