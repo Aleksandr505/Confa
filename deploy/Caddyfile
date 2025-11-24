@@ -1,3 +1,17 @@
+# Admin-Client
+admin.example.com {
+    @allowedIps remote_ip 10.0.113.10/32 198.34.100.67/32
+
+    handle @allowedIps {
+        encode gzip
+        reverse_proxy admin-client:80
+    }
+
+    handle {
+        redir https://example.com 302
+    }
+}
+
 # Client
 example.com {
         encode gzip
