@@ -66,12 +66,12 @@ public class SecurityConfiguration {
                 .logout(ServerHttpSecurity.LogoutSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                       // .pathMatchers("/admin/**").access(hasRole("ADMIN"))
-                        .pathMatchers("/admin/**").permitAll()
+                        .pathMatchers("/admin/**").access(hasRole("ADMIN"))
+                     //   .pathMatchers("/admin/**").permitAll()
                         .pathMatchers("/auth", "/auth/refresh").permitAll()
-                        .pathMatchers("/rooms/**").hasRole("ADMIN")
-                        //.pathMatchers("/rooms/**").authenticated()
-                        .pathMatchers("/api/livekit/token").authenticated()
+                      //  .pathMatchers("/rooms/**").hasRole("ADMIN")
+                        .pathMatchers("/rooms/**").authenticated()
+                        .pathMatchers("/livekit/token").authenticated()
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
