@@ -8,6 +8,8 @@ source ./deploy/client.build.env
 CLIENT_ARGS=( --build-arg VITE_API_BASE="$VITE_API_BASE"
               --build-arg VITE_LIVEKIT_WS_URL="$VITE_LIVEKIT_WS_URL" )
 
+ADMIN_CLIENT_ARGS=( --build-arg VITE_API_BASE="$VITE_API_BASE" )
+
 # Spring Boot build
 ( cd backend && ./mvnw -q -DskipTests package )
 cp backend/api/target/*.jar backend/api/target/app.jar
@@ -21,4 +23,8 @@ docker buildx build --platform linux/amd64,linux/arm64 -t "$REG/api:$TAG" -f bac
 docker buildx build --platform linux/amd64,linux/arm64 -t "$REG/client:$TAG" -f frontend/client/Dockerfile frontend/client \
   "${CLIENT_ARGS[@]}" --push
 
-echo "Pushed: $REG/api:$TAG, $REG/client:$TAG"
+# ADMIN-CLIENT
+docker buildx build --platform linux/amd64,linux/arm64 -t "$REG/admin-client:$TAG" -f frontend/admin-client/Dockerfile frontend/admin-client \
+  "${ADMIN_CLIENT_ARGS[@]}" --push
+
+echo "Pushed: $REG/api:$TAG, $REG/client:$TAG, $REG/admin-client:$TAG"

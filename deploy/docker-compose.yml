@@ -64,13 +64,14 @@ services:
       - "80"
     networks: [shared_web]
 
-    #  admin:
-    #  image: ${ADMIN_IMAGE}
-    # container_name: admin
-    # expose:
-    #   - "80"
-    #  networks: [shared_web]
-
+  admin-client:
+    image: ${ADMIN_CLIENT_IMAGE}
+    container_name: admin-client
+    #ports:
+    #- "3000:80"
+    expose:
+      - "80"
+    networks: [ shared_web ]
 
   mysql:
     image: mysql:8.0

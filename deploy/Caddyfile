@@ -1,6 +1,6 @@
 # Admin-Client
 admin.example.com {
-    @allowedIps remote_ip 10.0.113.10/32 198.34.100.67/32
+    @allowedIps remote_ip 95.45.13.52/32
 
     handle @allowedIps {
         encode gzip
@@ -12,16 +12,36 @@ admin.example.com {
     }
 }
 
+# API
+api.example.com {
+    encode gzip
+
+    @adminAllowed {
+        remote_ip 95.45.13.52/32
+        path /admin/*
+    }
+
+    @adminBlocked {
+        path /admin/*
+    }
+
+    handle @adminAllowed {
+        reverse_proxy api:8080
+    }
+
+    handle @adminBlocked {
+        respond "Forbidden" 403
+    }
+
+    handle {
+        reverse_proxy api:8080
+    }
+}
+
 # Client
 example.com {
         encode gzip
         reverse_proxy client:80
-}
-
-# API
-api.example.com {
-        encode gzip
-        reverse_proxy api:8080
 }
 
 # LiveKit
