@@ -73,6 +73,7 @@ export async function muteAgent(
 }
 
 export async function focusAgent(room: string, identity: string): Promise<void> {
+    identity.length
     await http<void>(
         `/rooms/${encodeURIComponent(room)}/agents/focus`,
         { method: 'POST' },

@@ -10,6 +10,8 @@ import * as deepgram from '@livekit/agents-plugin-deepgram';
 import { getAgentConfig, type AgentRole } from './configuration/config.js';
 import { ConfigurableAgent } from './configuration/configurableAgent.js';
 import {Room} from "@livekit/rtc-node";
+import { stt as coreSTT } from '@livekit/agents';
+import { YandexShortAudioSTT } from './speechkit/yandex-stt.js';
 
 
 dotenv.config({ path: '.env.local' });
@@ -88,7 +90,28 @@ export default defineAgent({
         const cfg = getAgentConfig(role);
         const assistant = new ConfigurableAgent(cfg);
 
-        const stt = new deepgram.STT({});
+        let stt: any;
+
+        if (process.env.STT_PROVIDER === 'yandex') {
+            console.log('[STT] Using Yandex SpeechKit via StreamAdapter');
+
+            const baseYandexStt = new YandexShortAudioSTT({
+                folderId: requireEnv('YANDEX_CLOUD_FOLDER'),
+                apiKey: process.env.YANDEX_SPEECHKIT_API_KEY
+                    ?? process.env.YANDEX_CLOUD_API_KEY,
+                lang: process.env.YANDEX_STT_LANG ?? 'ru-RU',
+                topic: process.env.YANDEX_STT_TOPIC ?? 'general',
+                sampleRateHertz: 16000,
+            });
+
+            stt = new coreSTT.StreamAdapter(
+                baseYandexStt as any,
+                vad,
+            );
+        } else {
+            console.log('[STT] Using Deepgram');
+            stt = new deepgram.STT({});
+        }
 
         let llm;
 
@@ -119,8 +142,10 @@ export default defineAgent({
         }
 
         const tts = new cartesia.TTS({
-            model: "sonic-2",
-            voice: "6ccbfb76-1fc6-48f7-b71d-91ac6298247b",
+            model: "sonic-3",
+         //   voice: "6ccbfb76-1fc6-48f7-b71d-91ac6298247b", // en
+            voice: "064b17af-d36b-4bfb-b003-be07dba1b649",   // ru
+            language: "ru",
             apiKey: requireEnv('CARTESIA_API_KEY'),
         });
 
@@ -134,22 +159,30 @@ export default defineAgent({
         });
 
 
-        const roomIO = new voice.RoomIO({
+        /*const roomIO = new voice.RoomIO({
             agentSession: session,
             room: ctx.room,
             inputOptions: {
+                audioSampleRate: 16000,
+                audioNumChannels: 1,
                 audioEnabled: true,
                 textEnabled: false,
             },
         });
 
-        roomIO.start();
+        roomIO.start();*/
 
         await ctx.connect();
 
         await session.start({
             agent: assistant,
             room: ctx.room,
+            inputOptions: {
+                audioEnabled: true,
+                textEnabled: false,
+                audioSampleRate: 16000,
+                audioNumChannels: 1,
+            },
         });
 
         console.log(`[Agent] Connected as ${ctx.room.localParticipant?.identity} in ${ctx.room.name}`);
@@ -228,7 +261,7 @@ export default defineAgent({
 
                     if (target) {
                         console.log('[Agent] switching target to', target);
-                        roomIO.setParticipant(target);
+            //            roomIO.setParticipant(target);
                     }
                     break;
                 case 'control.muted':
