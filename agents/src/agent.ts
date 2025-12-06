@@ -12,6 +12,7 @@ import { ConfigurableAgent } from './configuration/configurableAgent.js';
 import {Room} from "@livekit/rtc-node";
 import { stt as coreSTT } from '@livekit/agents';
 import { YandexShortAudioSTT } from './speechkit/yandex-stt.js';
+import { YandexTTS } from './speechkit/yandex-tts.js';
 
 
 dotenv.config({ path: '.env.local' });
@@ -141,14 +142,30 @@ export default defineAgent({
             });
         }
 
-        const tts = new cartesia.TTS({
-            model: "sonic-3",
-         //   voice: "6ccbfb76-1fc6-48f7-b71d-91ac6298247b", // en
-            voice: "064b17af-d36b-4bfb-b003-be07dba1b649",   // ru
-            language: "ru",
-            apiKey: requireEnv('CARTESIA_API_KEY'),
-        });
+        let tts;
 
+        if (process.env.TTS_PROVIDER === 'yandex') {
+            console.log('[TTS] Using Yandex SpeechKit');
+
+            tts = new YandexTTS({
+                folderId: requireEnv('YANDEX_CLOUD_FOLDER'),
+                apiKey: process.env.YANDEX_CLOUD_API_KEY,
+                voice: process.env.YANDEX_TTS_VOICE ?? 'marina',
+                role: process.env.YANDEX_TTS_ROLE ?? 'neutral',
+                speed: Number(process.env.YANDEX_TTS_SPEED ?? '1.0'),
+                sampleRateHertz: 16000,
+            });
+        } else {
+            console.log('[TTS] Using Cartesia TTS');
+
+            tts = new cartesia.TTS({
+                model: "sonic-3",
+                //   voice: "6ccbfb76-1fc6-48f7-b71d-91ac6298247b", // en
+                voice: "064b17af-d36b-4bfb-b003-be07dba1b649",   // ru
+                language: "ru",
+                apiKey: requireEnv('CARTESIA_API_KEY'),
+            });
+        }
 
         const session = new voice.AgentSession({
             vad,
