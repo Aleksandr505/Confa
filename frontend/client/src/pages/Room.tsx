@@ -9,6 +9,7 @@ import {
     useLocalParticipantPermissions,
     ConnectionStateToast,
     useRoomContext,
+    useRemoteParticipants,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import {
@@ -46,6 +47,7 @@ export default function RoomPage() {
     const [token, setToken] = useState<string>();
     const [ready, setReady] = useState(false);
     const [choices, setChoices] = useState<Choices | null>(null);
+    const [volumePanelOpen, setVolumePanelOpen] = useState(false);
 
     const [prejoinError, setPrejoinError] = useState<string>();
     const [permIssue, setPermIssue] = useState<PermIssue | null>(null);
@@ -305,7 +307,16 @@ export default function RoomPage() {
                         <span className="brand-dot" />
                         <span className="brand-title">Комната: {roomId}</span>
                     </div>
-                    <RoomPermissionHint />
+                    <div className="appbar-actions">
+                        <button
+                            className="btn ghost small"
+                            type="button"
+                            onClick={() => setVolumePanelOpen(v => !v)}
+                        >
+                            {volumePanelOpen ? 'Скрыть громкость' : 'Громкость участников'}
+                        </button>
+                        <RoomPermissionHint />
+                    </div>
                 </header>
 
                 {agentsFeatureEnabled ? (
@@ -441,6 +452,7 @@ export default function RoomPage() {
 
 
                 <PermissionBanner issue={permIssue} clearIssue={() => setPermIssue(null)} />
+                <VolumesPanel open={volumePanelOpen} onClose={() => setVolumePanelOpen(false)} />
 
                 <main className="lk-main">
                     <VideoConference />
@@ -450,6 +462,80 @@ export default function RoomPage() {
                 <RoomAudioRenderer />
                 <ConnectionStateToast />
             </LiveKitRoom>
+        </div>
+    );
+}
+
+function VolumesPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+    const participants = useRemoteParticipants();
+    const [volumes, setVolumes] = useState<Record<string, number>>({});
+
+    useEffect(() => {
+        for (const p of participants) {
+            const volume = volumes[p.identity];
+            if (volume !== undefined) {
+                p.setVolume(volume);
+            }
+        }
+    }, [participants, volumes]);
+
+    useEffect(() => {
+        const known = new Set(participants.map(p => p.identity));
+        setVolumes(current => {
+            const stale = Object.keys(current).filter(id => !known.has(id));
+            if (stale.length === 0) return current;
+            const next = { ...current };
+            stale.forEach(id => delete next[id]);
+            return next;
+        });
+    }, [participants]);
+
+    if (!open) return null;
+
+    return (
+        <div className="volume-panel volume-panel--floating">
+            <div className="volume-panel__header">
+                <div className="volume-panel__title">
+                    <span className="volume-panel__name">Громкость</span>
+                </div>
+                <button className="btn ghost small" type="button" onClick={onClose}>
+                    Закрыть
+                </button>
+            </div>
+            {participants.length === 0 ? (
+                <div className="volume-panel__empty">В комнате пока никого нет</div>
+            ) : (
+                <div className="volume-panel__list">
+                    {participants.map(p => {
+                        const currentVolume = volumes[p.identity] ?? 1;
+                        const label = p.name || p.identity;
+                        return (
+                            <div className="volume-row" key={p.sid}>
+                                <div className="volume-row__title" title={label}>
+                                    {label}
+                                </div>
+                                <div className="volume-row__controls">
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={1}
+                                        step={0.01}
+                                        value={currentVolume}
+                                        onChange={e => {
+                                            const next = Number(e.target.value);
+                                            setVolumes(map => ({ ...map, [p.identity]: next }));
+                                            p.setVolume(next);
+                                        }}
+                                    />
+                                    <span className="volume-row__value">
+                                        {Math.round(currentVolume * 100)}%
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }

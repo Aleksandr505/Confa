@@ -47,6 +47,7 @@
     border-radius: 18px;
     overflow: hidden;
     box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+    position: relative;
 }
 
 .lk-appbar {
@@ -64,6 +65,7 @@
     box-shadow: 0 0 14px rgba(124,58,237,0.6);
 }
 .brand-title { font-weight: 600; letter-spacing: 0.2px; }
+.appbar-actions { display: flex; align-items: center; gap: 10px; }
 
 .lk-main {
     flex: 1;
@@ -295,4 +297,100 @@
     height: 28px;
     padding: 0;
     font-size: 16px;
+}
+
+.volume-panel {
+    padding: 12px 14px 14px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+    background: linear-gradient(
+            135deg,
+            rgba(17, 24, 39, 0.9),
+            rgba(15, 23, 42, 0.95)
+    );
+    color: #e5e7eb;
+}
+
+.volume-panel__header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 13px;
+    justify-content: space-between;
+}
+
+.volume-panel__title {
+    display: flex;
+    align-items: center;
+}
+
+.volume-panel__name {
+    font-weight: 600;
+}
+
+.volume-panel__list {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    margin-top: 8px;
+}
+
+.volume-row {
+    background: rgba(31, 41, 55, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 6px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+.volume-row__title {
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.volume-row__controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.volume-row__controls input[type="range"] {
+    flex: 1;
+    accent-color: #7c3aed;
+    cursor: pointer;
+}
+
+.volume-row__value {
+    width: 48px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #cbd5e1;
+}
+
+.volume-panel__empty {
+    margin-top: 8px;
+    color: #cbd5e1;
+    font-size: 13px;
+}
+
+.volume-panel--floating {
+    position: absolute;
+    top: 74px;
+    right: 12px;
+    width: min(360px, 94%);
+    z-index: 12;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+}
+
+@media (max-width: 720px) {
+    .volume-panel--floating {
+        right: 8px;
+        top: 70px;
+        width: calc(100% - 16px);
+    }
 }
