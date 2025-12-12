@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     LiveKitRoom,
@@ -471,6 +471,7 @@ export default function RoomPage() {
 
                 <PermissionBanner issue={permIssue} clearIssue={() => setPermIssue(null)} />
                 <VolumesPanel open={volumePanelOpen} onClose={() => setVolumePanelOpen(false)} />
+                <ParticipantJoinTone />
 
                 <main className="lk-main">
                     <VideoConference />
@@ -556,6 +557,63 @@ function VolumesPanel({ open, onClose }: { open: boolean; onClose: () => void })
             )}
         </div>
     );
+}
+
+function ParticipantJoinTone() {
+    const participants = useRemoteParticipants();
+    const prevCount = useRef<number | null>(null);
+    const audioCtx = useRef<AudioContext | null>(null);
+
+    useEffect(() => {
+        if (prevCount.current === null) {
+            prevCount.current = participants.length;
+            return;
+        }
+        if (participants.length > (prevCount.current ?? 0)) {
+            playTone();
+        }
+        prevCount.current = participants.length;
+    }, [participants.length]);
+
+    useEffect(() => {
+        return () => {
+            audioCtx.current?.close().catch(() => {});
+        };
+    }, []);
+
+    const playTone = () => {
+        const ctx = audioCtx.current ?? new AudioContext();
+        audioCtx.current = ctx;
+        ctx.resume().catch(() => {});
+
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(660, now);
+        gain1.gain.setValueAtTime(0.0001, now);
+        gain1.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+        gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.16);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        const start2 = now + 0.18;
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(880, start2);
+        gain2.gain.setValueAtTime(0.0001, start2);
+        gain2.gain.exponentialRampToValueAtTime(0.07, start2 + 0.01);
+        gain2.gain.exponentialRampToValueAtTime(0.0001, start2 + 0.12);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(start2);
+        osc2.stop(start2 + 0.14);
+    };
+
+    return null;
 }
 
 function RoomPermissionHint() {
