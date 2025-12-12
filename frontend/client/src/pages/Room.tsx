@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
     LiveKitRoom,
     VideoConference,
@@ -20,10 +20,14 @@ import {
     muteAgent,
     focusAgent,
     type AgentInfoDto,
-    type AgentRole, type RoomMetadata, fetchRoomMetadata, enableRoomAgents, disableRoomAgents,
+    type AgentRole,
+    type RoomMetadata,
+    fetchRoomMetadata,
+    enableRoomAgents,
+    disableRoomAgents,
 } from '../api';
 import '../styles/livekit-theme.css';
-import {isAdmin} from "../lib/auth.ts";
+import { isAdmin } from '../lib/auth.ts';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 
@@ -43,6 +47,7 @@ type PermIssue = {
 
 export default function RoomPage() {
     const { roomId = 'demo' } = useParams();
+    const navigate = useNavigate();
 
     const [token, setToken] = useState<string>();
     const [ready, setReady] = useState(false);
@@ -227,6 +232,13 @@ export default function RoomPage() {
                             <span className="brand-dot" />
                             <span className="brand-title">Комната: {roomId}</span>
                         </div>
+                        <button
+                            className="btn ghost small"
+                            type="button"
+                            onClick={() => navigate('/')}
+                        >
+                            На главную
+                        </button>
                     </header>
                     <main className="prejoin-main">
                         {prejoinError && <div className="soft-alert">{prejoinError}</div>}
@@ -279,7 +291,7 @@ export default function RoomPage() {
                 data-lk-theme="default"
                 serverUrl={wsUrl}
                 token={token}
-                connect
+                connect={ready}
                 audio={audioProp}
                 video={videoProp}
                 className="lk-room-shell"
@@ -300,6 +312,12 @@ export default function RoomPage() {
                 }}
                 onError={e => {
                     console.error(e);
+                }}
+                onDisconnected={() => {
+                    setReady(false);
+                    setToken(undefined);
+                    setVolumePanelOpen(false);
+                    navigate('/', { replace: true });
                 }}
             >
                 <header className="lk-appbar">

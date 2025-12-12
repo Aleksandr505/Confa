@@ -213,6 +213,12 @@
     border-color: rgba(255,255,255,0.25);
     color: #e5e7eb;
 }
+.prejoin-shell.theme-light .btn.ghost.small {
+    background: rgba(79, 70, 229, 0.08);
+    border-color: rgba(79, 70, 229, 0.18);
+    color: #1f2937;
+    font-weight: 600;
+}
 
 .perm-hint {
     font-size: 12px;
