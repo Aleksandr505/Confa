@@ -499,6 +499,19 @@ function VolumesPanel({ open, onClose }: { open: boolean; onClose: () => void })
     }, [participants, volumes]);
 
     useEffect(() => {
+        let changed = false;
+        const next = { ...volumes };
+        for (const p of participants) {
+            if (next[p.identity] === undefined) {
+                next[p.identity] = 0.5;
+                p.setVolume(0.5);
+                changed = true;
+            }
+        }
+        if (changed) setVolumes(next);
+    }, [participants, volumes]);
+
+    useEffect(() => {
         const known = new Set(participants.map(p => p.identity));
         setVolumes(current => {
             const stale = Object.keys(current).filter(id => !known.has(id));
@@ -526,7 +539,7 @@ function VolumesPanel({ open, onClose }: { open: boolean; onClose: () => void })
             ) : (
                 <div className="volume-panel__list">
                     {participants.map(p => {
-                        const currentVolume = volumes[p.identity] ?? 1;
+                        const currentVolume = volumes[p.identity] ?? 0.5;
                         const label = p.name || p.identity;
                         return (
                             <div className="volume-row" key={p.sid}>
