@@ -7,8 +7,11 @@ function hashString(input: string) {
 }
 
 export function getAvatarColor(identity: string) {
-    const hue = hashString(identity || 'anon') % 360;
-    return `hsl(${hue} 70% 45%)`;
+    const hash = hashString(identity || 'anon');
+    const hue = (hash % 12) * 30;
+    const sat = 60 + (hash % 20);
+    const light = 42 + ((hash >> 4) % 14);
+    return `hsl(${hue} ${sat}% ${light}%)`;
 }
 
 export function getAvatarUrl(identity: string, name?: string) {
