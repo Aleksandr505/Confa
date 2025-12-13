@@ -37,6 +37,11 @@ export type KickAgentDto = {
     agentIdentity: string;
 };
 
+export type FocusAgentDto = {
+    activeAgentIdentity: string;
+    userIdentity: string;
+};
+
 export async function fetchRoomAgents(room: string): Promise<AgentInfoDto[]> {
     return http<AgentInfoDto[]>(`/rooms/${encodeURIComponent(room)}/agents`, {
         method: 'GET',
@@ -72,12 +77,11 @@ export async function muteAgent(
     );
 }
 
-export async function focusAgent(room: string, identity: string): Promise<void> {
-    identity.length
-    await http<void>(
-        `/rooms/${encodeURIComponent(room)}/agents/focus`,
-        { method: 'POST' },
-    );
+export async function focusAgent(room: string, payload: FocusAgentDto): Promise<void> {
+    await http<void>(`/rooms/${encodeURIComponent(room)}/agents/focus`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
 }
 
 export type RoomMetadata = {

@@ -33,7 +33,7 @@ import {
     disableRoomAgents,
 } from '../api';
 import '../styles/livekit-theme.css';
-import { isAdmin } from '../lib/auth.ts';
+import { getUserIdentity, isAdmin } from '../lib/auth.ts';
 import { getAvatarColor, getAvatarUrl } from '../lib/avatar';
 import { Track } from 'livekit-client';
 
@@ -223,8 +223,16 @@ export default function RoomPage() {
 
     async function handleFocus() {
         if (!roomId || !selectedAgentId) return;
+        const userIdentity = getUserIdentity();
+        if (!userIdentity) {
+            alert('Не удалось определить вашу identity');
+            return;
+        }
         try {
-            await focusAgent(roomId, selectedAgentId);
+            await focusAgent(roomId, {
+                activeAgentIdentity: selectedAgentId,
+                userIdentity,
+            });
             alert('Агенту отправлен сигнал сфокусироваться на вас');
         } catch (e: any) {
             alert(e?.message || 'Не удалось сфокусировать агента');
@@ -677,15 +685,19 @@ function ParticipantTile() {
     if (!trackRef) return null;
 
     const participant = trackRef.participant;
-    const isCamMuted = useIsMuted('camera', { participant });
+    const isCamMuted = useIsMuted(trackRef);
+    const hasVideo = !!trackRef.publication?.track;
+    const videoTrackRef = hasVideo ? (trackRef as any) : undefined;
     const label = participant.name ?? participant.identity;
     const avatar = getAvatarUrl(participant.identity, participant.name);
 
     return (
         <div className="tile">
             <div className="tile__media">
-                <VideoTrack trackRef={trackRef} />
-                {isCamMuted && <AvatarFallback identity={participant.identity} label={label} />}
+                {videoTrackRef && <VideoTrack trackRef={videoTrackRef} />}
+                {(isCamMuted || !hasVideo) && (
+                    <AvatarFallback identity={participant.identity} label={label} />
+                )}
             </div>
             <div className="tile__footer">
                 <span

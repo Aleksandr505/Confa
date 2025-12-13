@@ -68,3 +68,11 @@ export function isAdmin(): boolean {
     const roles = getUserRoles();
     return roles.includes('ADMIN') || roles.includes('ROLE_ADMIN');
 }
+
+export function getUserIdentity(): string | null {
+    const token = getAccessToken();
+    if (!token) return null;
+    const payload = decodeJwtPayload(token);
+    if (!payload) return null;
+    return payload.sub || payload.user || payload.username || null;
+}
