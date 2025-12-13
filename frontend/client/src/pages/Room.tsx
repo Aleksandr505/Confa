@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useContext } from 'react';
 import {
     LiveKitRoom,
-    VideoConference,
     RoomAudioRenderer,
     StartAudio,
     PreJoin,
@@ -10,6 +10,12 @@ import {
     ConnectionStateToast,
     useRoomContext,
     useRemoteParticipants,
+    TrackLoop,
+    TrackRefContext,
+    VideoTrack,
+    useIsMuted,
+    useTracks,
+    ControlBar,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import {
@@ -28,6 +34,8 @@ import {
 } from '../api';
 import '../styles/livekit-theme.css';
 import { isAdmin } from '../lib/auth.ts';
+import { getAvatarColor, getAvatarUrl } from '../lib/avatar';
+import { Track } from 'livekit-client';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 
@@ -364,17 +372,17 @@ export default function RoomPage() {
                         <div className="agent-section">
                             <span className="agent-label">Управление агентами</span>
                             <div className="agent-actions">
-                                <select
-                                    value={selectedAgentId ?? ''}
-                                    onChange={e => setSelectedAgentId(e.target.value || undefined)}
-                                >
-                                    {agents.length === 0 && <option value="">Агентов нет</option>}
-                                    {agents.map(a => (
-                                        <option key={a.identity} value={a.identity}>
-                                            {a.name || a.identity} {a.muted ? '· muted' : ''}
-                                        </option>
-                                    ))}
-                                </select>
+                        <select
+                            value={selectedAgentId ?? ''}
+                            onChange={e => setSelectedAgentId(e.target.value || undefined)}
+                        >
+                            {agents.length === 0 && <option value="">Агентов нет</option>}
+                            {agents.map(a => (
+                                <option key={a.identity} value={a.identity}>
+                                    {a.name || a.identity} {a.muted ? '· muted' : ''}
+                                </option>
+                            ))}
+                        </select>
                                 <button
                                     className="btn ghost small"
                                     type="button"
@@ -414,6 +422,16 @@ export default function RoomPage() {
 
                             {selectedAgent && (
                                 <div className="agent-status">
+                                    <span
+                                        className="avatar-icon"
+                                        style={{
+                                            backgroundImage: `url(${getAvatarUrl(
+                                                selectedAgent.identity,
+                                                selectedAgent.name,
+                                            )})`,
+                                        }}
+                                        aria-hidden
+                                    />
                                     <span
                                         className={'agent-dot ' + (selectedAgent.muted ? 'muted' : '')}
                                     />
@@ -474,7 +492,8 @@ export default function RoomPage() {
                 <ParticipantJoinTone />
 
                 <main className="lk-main">
-                    <VideoConference />
+                    <ParticipantsGrid />
+                    <ControlBar />
                 </main>
 
                 <StartAudio label="Включить звук в браузере" />
@@ -544,6 +563,11 @@ function VolumesPanel({ open, onClose }: { open: boolean; onClose: () => void })
                         return (
                             <div className="volume-row" key={p.sid}>
                                 <div className="volume-row__title" title={label}>
+                                    <span
+                                        className="avatar-icon"
+                                        style={{ backgroundImage: `url(${getAvatarUrl(p.identity, p.name)})` }}
+                                        aria-hidden
+                                    />
                                     {label}
                                 </div>
                                 <div className="volume-row__controls">
@@ -627,6 +651,68 @@ function ParticipantJoinTone() {
     };
 
     return null;
+}
+
+function AvatarFallback({ identity, label }: { identity: string; label: string }) {
+    const initials = label
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(s => s[0]?.toUpperCase())
+        .join('');
+
+    return (
+        <div
+            className="avatar-fallback"
+            style={{ backgroundColor: getAvatarColor(identity) }}
+            aria-hidden
+        >
+            {initials || '?'}
+        </div>
+    );
+}
+
+function ParticipantTile() {
+    const trackRef = useContext(TrackRefContext);
+    if (!trackRef) return null;
+
+    const participant = trackRef.participant;
+    const isCamMuted = useIsMuted('camera', { participant });
+    const label = participant.name ?? participant.identity;
+    const avatar = getAvatarUrl(participant.identity, participant.name);
+
+    return (
+        <div className="tile">
+            <div className="tile__media">
+                <VideoTrack trackRef={trackRef} />
+                {isCamMuted && <AvatarFallback identity={participant.identity} label={label} />}
+            </div>
+            <div className="tile__footer">
+                <span
+                    className="avatar-icon"
+                    style={{ backgroundImage: `url(${avatar})` }}
+                    aria-hidden
+                />
+                <span className="tile__label">{label}</span>
+            </div>
+        </div>
+    );
+}
+
+function ParticipantsGrid() {
+    const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }]);
+
+    if (tracks.length === 0) {
+        return <div className="participants-empty">Участников пока нет</div>;
+    }
+
+    return (
+        <div className="participants-grid">
+            <TrackLoop tracks={tracks}>
+                <ParticipantTile />
+            </TrackLoop>
+        </div>
+    );
 }
 
 function RoomPermissionHint() {
