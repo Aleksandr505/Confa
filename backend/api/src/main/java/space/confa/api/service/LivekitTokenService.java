@@ -31,7 +31,7 @@ public class LivekitTokenService {
                 new CanPublish(true),
                 new CanSubscribe(true),
                 new RoomName(dto.room() != null ? dto.room() : defaultRoom()),
-                new CanPublishSources(List.of("microphone","camera"))
+                new CanPublishSources(List.of("microphone", "camera", "screen_share", "screen_share_audio"))
         );
         token.setTtl(600L);
 

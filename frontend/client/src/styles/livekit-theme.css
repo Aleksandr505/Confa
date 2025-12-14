@@ -428,7 +428,7 @@
 }
 .lk-video-conference .lk-participant-placeholder .avatar-circle,
 .lk-video-conference .lk-participant-placeholder .avatar-fallback {
-    width: min(140px, 60%);
+    width: clamp(180px, 72%, 260px);
     aspect-ratio: 1;
     border-radius: 50%;
     background-size: cover;

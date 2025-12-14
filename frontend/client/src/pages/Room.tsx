@@ -54,7 +54,7 @@ import {
 import '../styles/livekit-theme.css';
 import { getUserIdentity, isAdmin } from '../lib/auth.ts';
 import { getAvatarColor, getAvatarUrl } from '../lib/avatar';
-import { RoomEvent, Track } from 'livekit-client';
+import { Track } from 'livekit-client';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 
@@ -806,13 +806,14 @@ function BrandedVideoConference() {
     });
     const lastAutoFocusedScreenShareTrack = useRef<TrackReferenceOrPlaceholder | null>(null);
     const layoutContext = useCreateLayoutContext();
+    const [screenShareError, setScreenShareError] = useState<string | null>(null);
 
     const tracks = useTracks(
         [
             { source: Track.Source.Camera, withPlaceholder: true },
             { source: Track.Source.ScreenShare, withPlaceholder: false },
         ],
-        { updateOnlyOn: [RoomEvent.ActiveSpeakersChanged], onlySubscribed: false },
+        { onlySubscribed: false },
     );
 
     const screenShareTracks = tracks
@@ -888,8 +889,31 @@ function BrandedVideoConference() {
                             </FocusLayoutContainer>
                         </div>
                     )}
-                    <ControlBar controls={{ chat: true }} />
+                    <ControlBar
+                        controls={{ chat: true, screenShare: true }}
+                        onDeviceError={({ source, error }) => {
+                            if (source === Track.Source.ScreenShare) {
+                                setScreenShareError(
+                                    error?.message ||
+                                        'Не удалось включить демонстрацию экрана. Проверьте разрешения браузера.',
+                                );
+                            }
+                        }}
+                    />
                 </div>
+                {screenShareError && (
+                    <div className="soft-alert" style={{ margin: '6px 12px' }}>
+                        {screenShareError}
+                        <button
+                            type="button"
+                            className="btn ghost small"
+                            style={{ marginLeft: 8 }}
+                            onClick={() => setScreenShareError(null)}
+                        >
+                            Ок
+                        </button>
+                    </div>
+                )}
                 <Chat style={{ display: widgetState.showChat ? 'grid' : 'none' }} />
             </LayoutContextProvider>
             <RoomAudioRenderer />
