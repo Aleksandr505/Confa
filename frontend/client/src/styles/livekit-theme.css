@@ -74,6 +74,10 @@
     display: flex;
     flex-direction: column;
 }
+.lk-main > .lk-video-conference {
+    flex: 1;
+    min-height: 0;
+}
 
 .lk-room-shell[data-lk-theme="default"] {
     --lk-bg: rgba(17, 24, 39, 0.55);
@@ -415,6 +419,32 @@
     background-repeat: no-repeat;
     display: inline-block;
     box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+    flex-shrink: 0;
+}
+
+.lk-video-conference .lk-participant-placeholder {
+    background: radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.04), transparent 45%),
+        rgba(10, 12, 20, 0.9);
+}
+.lk-video-conference .lk-participant-placeholder .avatar-circle,
+.lk-video-conference .lk-participant-placeholder .avatar-fallback {
+    width: min(140px, 60%);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    display: grid;
+    place-items: center;
+}
+.lk-video-conference .lk-participant-placeholder .avatar-fallback {
+    position: static;
+    inset: auto;
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
 }
 
 .participants-grid {

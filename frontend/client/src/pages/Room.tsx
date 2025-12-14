@@ -1,23 +1,42 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useContext } from 'react';
 import {
+    AudioTrack,
+    CarouselLayout,
+    Chat,
+    ConnectionQualityIndicator,
+    ConnectionStateToast,
+    ControlBar,
+    FocusLayoutContainer,
+    GridLayout,
+    LayoutContextProvider,
     LiveKitRoom,
+    ParticipantName,
+    ParticipantTile,
+    type ParticipantTileProps,
+    PreJoin,
     RoomAudioRenderer,
     StartAudio,
-    PreJoin,
+    TrackMutedIndicator,
+    useCreateLayoutContext,
+    useFeatureContext,
     useLocalParticipantPermissions,
-    ConnectionStateToast,
-    useRoomContext,
+    useMaybeLayoutContext,
+    useMaybeTrackRefContext,
+    usePinnedTracks,
     useRemoteParticipants,
-    TrackLoop,
-    TrackRefContext,
-    VideoTrack,
-    useIsMuted,
+    useRoomContext,
     useTracks,
-    ControlBar,
+    VideoTrack,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
+import {
+    isEqualTrackRef,
+    isTrackReferencePinned,
+    isTrackReference,
+    type TrackReferenceOrPlaceholder,
+    type WidgetState,
+} from '@livekit/components-core';
 import {
     fetchLivekitToken,
     fetchRoomAgents,
@@ -35,7 +54,7 @@ import {
 import '../styles/livekit-theme.css';
 import { getUserIdentity, isAdmin } from '../lib/auth.ts';
 import { getAvatarColor, getAvatarUrl } from '../lib/avatar';
-import { Track } from 'livekit-client';
+import { RoomEvent, Track } from 'livekit-client';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 
@@ -500,13 +519,10 @@ export default function RoomPage() {
                 <ParticipantJoinTone />
 
                 <main className="lk-main">
-                    <ParticipantsGrid />
-                    <ControlBar />
+                    <BrandedVideoConference />
                 </main>
 
                 <StartAudio label="Включить звук в браузере" />
-                <RoomAudioRenderer />
-                <ConnectionStateToast />
             </LiveKitRoom>
         </div>
     );
@@ -680,49 +696,204 @@ function AvatarFallback({ identity, label }: { identity: string; label: string }
     );
 }
 
-function ParticipantTile() {
-    const trackRef = useContext(TrackRefContext);
+function BrandedTileContent() {
+    const trackRef = useMaybeTrackRefContext();
+    const layoutContext = useMaybeLayoutContext();
+    const autoManageSubscription = useFeatureContext()?.autoSubscription;
+
+    const handleSubscribe = useCallback(
+        (subscribed: boolean) => {
+            if (
+                !trackRef?.source ||
+                !layoutContext?.pin.dispatch ||
+                !layoutContext.pin.state ||
+                subscribed
+            ) {
+                return;
+            }
+            if (isTrackReferencePinned(trackRef, layoutContext.pin.state)) {
+                layoutContext.pin.dispatch({ msg: 'clear_pin' });
+            }
+        },
+        [layoutContext, trackRef],
+    );
+
     if (!trackRef) return null;
 
     const participant = trackRef.participant;
-    const isCamMuted = useIsMuted(trackRef);
-    const hasVideo = !!trackRef.publication?.track;
-    const videoTrackRef = hasVideo ? (trackRef as any) : undefined;
-    const label = participant.name ?? participant.identity;
-    const avatar = getAvatarUrl(participant.identity, participant.name);
+    const name = participant.name ?? participant.identity;
+    const avatarUrl = getAvatarUrl(participant.identity, participant.name);
+    const isScreenShare = trackRef.source === Track.Source.ScreenShare;
+    const micPublication = participant.getTrackPublication(Track.Source.Microphone);
+
+    const isVideoTrack =
+        isTrackReference(trackRef) &&
+        (trackRef.publication?.kind === 'video' ||
+            trackRef.source === Track.Source.Camera ||
+            trackRef.source === Track.Source.ScreenShare);
+    const isAudioTrack = isTrackReference(trackRef) && !isVideoTrack;
 
     return (
-        <div className="tile">
-            <div className="tile__media">
-                {videoTrackRef && <VideoTrack trackRef={videoTrackRef} />}
-                {(isCamMuted || !hasVideo) && (
-                    <AvatarFallback identity={participant.identity} label={label} />
+        <>
+            {isVideoTrack && (
+                <VideoTrack
+                    trackRef={trackRef}
+                    onSubscriptionStatusChanged={handleSubscribe}
+                    manageSubscription={autoManageSubscription}
+                />
+            )}
+            {isAudioTrack && (
+                <AudioTrack
+                    trackRef={trackRef}
+                    onSubscriptionStatusChanged={handleSubscribe}
+                />
+            )}
+            <div className="lk-participant-placeholder">
+                {avatarUrl ? (
+                    <span
+                        className="avatar-circle"
+                        style={{ backgroundImage: `url(${avatarUrl})` }}
+                        aria-hidden
+                    />
+                ) : (
+                    <AvatarFallback identity={participant.identity} label={name} />
                 )}
             </div>
-            <div className="tile__footer">
-                <span
-                    className="avatar-icon"
-                    style={{ backgroundImage: `url(${avatar})` }}
-                    aria-hidden
-                />
-                <span className="tile__label">{label}</span>
+            <div className="lk-participant-metadata">
+                <div className="lk-participant-metadata-item">
+                    {!isScreenShare && (
+                        <span
+                            className="avatar-icon"
+                            style={{ backgroundImage: `url(${avatarUrl})` }}
+                            aria-hidden
+                        />
+                    )}
+                    {isScreenShare ? (
+                        <ParticipantName>&apos;s screen</ParticipantName>
+                    ) : (
+                        <>
+                            <TrackMutedIndicator
+                                trackRef={{
+                                    participant,
+                                    source: Track.Source.Microphone,
+                                    publication: micPublication,
+                                }}
+                                show="muted"
+                            />
+                            <ParticipantName />
+                        </>
+                    )}
+                </div>
+                <ConnectionQualityIndicator className="lk-participant-metadata-item" />
             </div>
-        </div>
+        </>
     );
 }
 
-function ParticipantsGrid() {
-    const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }]);
+function BrandedParticipantTile(props: ParticipantTileProps) {
+    return (
+        <ParticipantTile {...props}>
+            <BrandedTileContent />
+        </ParticipantTile>
+    );
+}
 
-    if (tracks.length === 0) {
-        return <div className="participants-empty">Участников пока нет</div>;
-    }
+function BrandedVideoConference() {
+    const [widgetState, setWidgetState] = useState<WidgetState>({
+        showChat: false,
+        unreadMessages: 0,
+        showSettings: false,
+    });
+    const lastAutoFocusedScreenShareTrack = useRef<TrackReferenceOrPlaceholder | null>(null);
+    const layoutContext = useCreateLayoutContext();
+
+    const tracks = useTracks(
+        [
+            { source: Track.Source.Camera, withPlaceholder: true },
+            { source: Track.Source.ScreenShare, withPlaceholder: false },
+        ],
+        { updateOnlyOn: [RoomEvent.ActiveSpeakersChanged], onlySubscribed: false },
+    );
+
+    const screenShareTracks = tracks
+        .filter(isTrackReference)
+        .filter(track => track.publication.source === Track.Source.ScreenShare);
+
+    const focusTrack = usePinnedTracks(layoutContext)?.[0];
+    const carouselTracks = tracks.filter(track => !isEqualTrackRef(track, focusTrack));
+
+    useEffect(() => {
+        const hasSubscribedScreenShare = screenShareTracks.some(
+            track => track.publication.isSubscribed,
+        );
+
+        if (hasSubscribedScreenShare && lastAutoFocusedScreenShareTrack.current === null) {
+            layoutContext.pin.dispatch?.({
+                msg: 'set_pin',
+                trackReference: screenShareTracks[0],
+            });
+            lastAutoFocusedScreenShareTrack.current = screenShareTracks[0];
+        } else if (
+            lastAutoFocusedScreenShareTrack.current &&
+            !screenShareTracks.some(
+                track =>
+                    track.publication.trackSid ===
+                    lastAutoFocusedScreenShareTrack.current?.publication?.trackSid,
+            )
+        ) {
+            layoutContext.pin.dispatch?.({ msg: 'clear_pin' });
+            lastAutoFocusedScreenShareTrack.current = null;
+        }
+        if (focusTrack && !isTrackReference(focusTrack)) {
+            const updatedFocusTrack = tracks.find(
+                tr =>
+                    tr.participant.identity === focusTrack.participant.identity &&
+                    tr.source === focusTrack.source,
+            );
+            if (updatedFocusTrack && isTrackReference(updatedFocusTrack)) {
+                layoutContext.pin.dispatch?.({
+                    msg: 'set_pin',
+                    trackReference: updatedFocusTrack,
+                });
+            }
+        }
+    }, [
+        focusTrack,
+        layoutContext,
+        screenShareTracks,
+        tracks,
+    ]);
+
+
 
     return (
-        <div className="participants-grid">
-            <TrackLoop tracks={tracks}>
-                <ParticipantTile />
-            </TrackLoop>
+        <div className="lk-video-conference">
+            <LayoutContextProvider value={layoutContext} onWidgetChange={state => setWidgetState(state)}>
+                <div className="lk-video-conference-inner">
+                    {!focusTrack ? (
+                        <div className="lk-grid-layout-wrapper">
+                            <GridLayout tracks={tracks}>
+                                <BrandedParticipantTile />
+                            </GridLayout>
+                        </div>
+                    ) : (
+                        <div className="lk-focus-layout-wrapper">
+                            <FocusLayoutContainer>
+                                <CarouselLayout tracks={carouselTracks}>
+                                    <BrandedParticipantTile />
+                                </CarouselLayout>
+                                {focusTrack && (
+                                    <BrandedParticipantTile trackRef={focusTrack} className="lk-focus-track" />
+                                )}
+                            </FocusLayoutContainer>
+                        </div>
+                    )}
+                    <ControlBar controls={{ chat: true }} />
+                </div>
+                <Chat style={{ display: widgetState.showChat ? 'grid' : 'none' }} />
+            </LayoutContextProvider>
+            <RoomAudioRenderer />
+            <ConnectionStateToast />
         </div>
     );
 }
