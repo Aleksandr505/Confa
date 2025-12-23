@@ -50,6 +50,10 @@ import {
     fetchRoomMetadata,
     enableRoomAgents,
     disableRoomAgents,
+    fetchMyRooms,
+    createInvite,
+    type RoomAccess,
+    type RoomInvite,
 } from '../api';
 import '../styles/livekit-theme.css';
 import { getUserIdentity, isAdmin } from '../lib/auth.ts';
@@ -95,9 +99,22 @@ export default function RoomPage() {
     const [roomConfigLoading, setRoomConfigLoading] = useState(false);
     const [roomConfigError, setRoomConfigError] = useState<string | null>(null);
 
+    const [roomAccess, setRoomAccess] = useState<RoomAccess | null>(null);
+    const [inviteInfo, setInviteInfo] = useState<RoomInvite | null>(null);
+    const [inviteError, setInviteError] = useState<string | null>(null);
+    const [inviteBusy, setInviteBusy] = useState(false);
+    const [inviteCopied, setInviteCopied] = useState(false);
+
     const isAdminUser = isAdmin();
 
     const agentsFeatureEnabled = roomConfig?.isAgentsEnabled === true;
+
+    useEffect(() => {
+        if (!roomId) return;
+        fetchMyRooms()
+            .then(list => setRoomAccess(list.find(r => r.name === roomId) || null))
+            .catch(() => {});
+    }, [roomId]);
 
     useEffect(() => {
         if (!ready || !roomId) return;
@@ -117,13 +134,21 @@ export default function RoomPage() {
     useEffect(() => {
         if (!ready) return;
         let cancelled = false;
+        setPrejoinError(undefined);
+        setToken(undefined);
         (async () => {
             try {
                 const displayName = choices?.username?.trim() || undefined;
                 const t = await fetchLivekitToken(roomId, displayName);
                 if (!cancelled) setToken(t);
             } catch (e: any) {
-                if (!cancelled) setPrejoinError(e?.message || 'Token error');
+                if (!cancelled) {
+                    const raw = e?.message || 'Token error';
+                    const friendly = raw.startsWith('403')
+                        ? 'Нет доступа к этой комнате. Попросите владельца выдать приглашение.'
+                        : raw;
+                    setPrejoinError(friendly);
+                }
             }
         })();
         return () => {
@@ -179,6 +204,12 @@ export default function RoomPage() {
         loadAgents(true);
     }, [ready, roomId, loadAgents]);
 
+    useEffect(() => {
+        if (!inviteInfo) {
+            setInviteCopied(false);
+        }
+    }, [inviteInfo]);
+
     async function handleEnableAgents() {
         if (!roomId) return;
         try {
@@ -201,6 +232,33 @@ export default function RoomPage() {
             setRoomConfig(cfg);
         } catch (e: any) {
             alert(e?.message || 'Не удалось отключить агентов');
+        }
+    }
+
+    async function handleCreateInvite() {
+        if (!roomId) return;
+        setInviteBusy(true);
+        setInviteError(null);
+        setInviteInfo(null);
+        try {
+            const invite = await createInvite(roomId, {});
+            setInviteInfo(invite);
+        } catch (e: any) {
+            setInviteError(e?.message || 'Не удалось создать приглашение');
+        } finally {
+            setInviteBusy(false);
+        }
+    }
+
+    async function handleCopyInvite() {
+        if (!inviteInfo) return;
+        const value = inviteInfo.inviteUrl || inviteInfo.token;
+        try {
+            await navigator.clipboard.writeText(value);
+            setInviteCopied(true);
+            setTimeout(() => setInviteCopied(false), 1500);
+        } catch (e: any) {
+            setInviteError(e?.message || 'Не удалось скопировать приглашение');
         }
     }
 
@@ -311,8 +369,23 @@ export default function RoomPage() {
         return (
             <div className="lk-root gradient-bg">
                 <div className="center-card">
-                    <div className="spinner" aria-label="loading" />
-                    <p className="muted">Подключаемся…</p>
+                    {prejoinError ? (
+                        <>
+                            <div className="soft-alert">{prejoinError}</div>
+                            <button
+                                className="btn ghost small"
+                                type="button"
+                                onClick={() => navigate('/', { replace: true })}
+                            >
+                                На главную
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <div className="spinner" aria-label="loading" />
+                            <p className="muted">Подключаемся…</p>
+                        </>
+                    )}
                 </div>
             </div>
         );
@@ -361,6 +434,16 @@ export default function RoomPage() {
                         <span className="brand-title">Комната: {roomId}</span>
                     </div>
                     <div className="appbar-actions">
+                        {roomAccess?.role === 'OWNER' && (
+                            <button
+                                className="btn ghost small"
+                                type="button"
+                                onClick={handleCreateInvite}
+                                disabled={inviteBusy}
+                            >
+                                {inviteBusy ? 'Создаём ссылку…' : 'Пригласить'}
+                            </button>
+                        )}
                         <button
                             className="btn ghost small"
                             type="button"
@@ -371,6 +454,28 @@ export default function RoomPage() {
                         <RoomPermissionHint />
                     </div>
                 </header>
+
+                {inviteError && (
+                    <div className="soft-alert" style={{ margin: '8px 12px', color: '#fecaca' }}>
+                        {inviteError}
+                    </div>
+                )}
+                {inviteInfo && (
+                    <div className="soft-alert" style={{ margin: '8px 12px' }}>
+                        <div style={{ fontWeight: 600, marginBottom: 4 }}>Приглашение готово</div>
+                        <div style={{ wordBreak: 'break-all', fontSize: 12, opacity: 0.8 }}>
+                            {inviteInfo.inviteUrl || inviteInfo.token}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                            <button className="btn ghost small" type="button" onClick={handleCopyInvite}>
+                                {inviteCopied ? 'Скопировано' : 'Скопировать ссылку'}
+                            </button>
+                            <button className="btn ghost small" type="button" onClick={() => setInviteInfo(null)}>
+                                Скрыть
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {agentsFeatureEnabled ? (
                     <div className="agent-bar">

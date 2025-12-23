@@ -24,6 +24,50 @@ export async function fetchLivekitToken(room?: string, displayName?: string) {
     return data.token;
 }
 
+export type RoomAccess = {
+    id: number;
+    name: string;
+    role: 'OWNER' | 'MEMBER';
+    isPrivate: boolean;
+};
+
+export type RoomInvite = {
+    token: string;
+    inviteUrl?: string | null;
+    roomName: string;
+    expiresAt?: string | null;
+    maxUses?: number | null;
+    usedCount?: number | null;
+};
+
+export async function fetchMyRooms(): Promise<RoomAccess[]> {
+    return http<RoomAccess[]>('/rooms/my', { method: 'GET' });
+}
+
+export async function createRoom(payload: { name: string; isPrivate?: boolean }): Promise<RoomAccess> {
+    return http<RoomAccess>('/rooms', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function createInvite(
+    roomName: string,
+    payload?: { ttlSeconds?: number; maxUses?: number },
+): Promise<RoomInvite> {
+    return http<RoomInvite>(`/rooms/${encodeURIComponent(roomName)}/invites`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+    });
+}
+
+export async function acceptInvite(token: string): Promise<RoomAccess> {
+    return http<RoomAccess>('/invites/accept', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+    });
+}
+
 export type AgentRole = 'bored' | 'friendly' | 'funny';
 
 export type AgentInfoDto = {

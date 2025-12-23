@@ -18,8 +18,17 @@ import java.util.List;
 public class LivekitTokenService {
 
     private final LivekitProp props;
+    private final RoomAccessService roomAccessService;
 
     public Mono<LivekitTokenDto> createTokenForUser(Jwt userJwt, CreateLivekitTokenDto dto) {
+        String roomName = dto.room() != null ? dto.room() : defaultRoom();
+        long userId = Long.parseLong(userJwt.getSubject());
+
+        return roomAccessService.checkUserCanJoin(userId, roomName)
+                .then(Mono.fromSupplier(() -> buildToken(userJwt, dto, roomName)));
+    }
+
+    private LivekitTokenDto buildToken(Jwt userJwt, CreateLivekitTokenDto dto, String roomName) {
         AccessToken token = new AccessToken(props.apiKey(), props.apiSecret());
 
         if (dto.displayName() != null) {
@@ -30,12 +39,11 @@ public class LivekitTokenService {
                 new RoomJoin(true),
                 new CanPublish(true),
                 new CanSubscribe(true),
-                new RoomName(dto.room() != null ? dto.room() : defaultRoom()),
+                new RoomName(roomName),
                 new CanPublishSources(List.of("microphone", "camera", "screen_share", "screen_share_audio"))
         );
         token.setTtl(600L);
-
-        return Mono.just(new LivekitTokenDto(token.toJwt()));
+        return new LivekitTokenDto(token.toJwt());
     }
 
     private String defaultRoom() {

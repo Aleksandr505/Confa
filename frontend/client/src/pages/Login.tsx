@@ -1,5 +1,5 @@
-import {type FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { type FormEvent, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { login } from '../api';
 import '../styles/login.css';
 
@@ -9,6 +9,8 @@ export default function LoginPage() {
     const [err, setErr] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const nav = useNavigate();
+    const [searchParams] = useSearchParams();
+    const inviteToken = searchParams.get('invite');
 
     async function onSubmit(e: FormEvent) {
         e.preventDefault();
@@ -16,7 +18,8 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await login(username, password);
-            nav('/', { replace: true });
+            const target = inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : '/';
+            nav(target, { replace: true });
         } catch (e: any) {
             setErr(e?.message || 'Login failed');
         } finally {
@@ -29,6 +32,11 @@ export default function LoginPage() {
             <div className="auth-card">
                 <h1 className="auth-title">Confa</h1>
                 <p className="auth-subtitle">Войдите, чтобы присоединиться к встрече</p>
+                {inviteToken && (
+                    <p className="auth-subtitle" style={{ fontSize: 13 }}>
+                        После входа мы примем приглашение автоматически.
+                    </p>
+                )}
 
                 <form className="auth-form" onSubmit={onSubmit}>
                     <label className="field">

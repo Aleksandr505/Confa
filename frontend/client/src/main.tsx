@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider, redirect } from 'react-router-dom'
 import LoginPage from './pages/Login';
 import RoomPage from './pages/Room';
 import HomePage from './pages/Home';
+import InvitePage from './pages/Invite';
 import { isAuthed } from './auth';
 import { loadTokensFromSession } from './lib/auth';
 
@@ -28,6 +29,16 @@ const router = createBrowserRouter([
             return null;
         },
         element: <RoomPage />,
+    },
+    {
+        path: '/invite/:token',
+        loader: async ({ params }) => {
+            if (!isAuthed()) {
+                throw redirect(`/login?invite=${encodeURIComponent(params.token || '')}`);
+            }
+            return null;
+        },
+        element: <InvitePage />,
     },
     {
         path: '*',

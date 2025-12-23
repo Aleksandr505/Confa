@@ -105,6 +105,17 @@
     box-shadow: 0 16px 40px rgba(59, 130, 246, 0.75);
 }
 
+.btn.ghost {
+    background: transparent;
+    border-color: var(--client-border);
+    color: var(--client-fg);
+}
+
+.btn.small {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+}
+
 .alert {
     border-radius: 999px;
     padding: 6px 10px;
@@ -115,4 +126,85 @@
     background: rgba(248, 113, 113, 0.13);
     border: 1px solid rgba(248, 113, 113, 0.45);
     color: #fee2e2;
+}
+
+.checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--client-muted);
+    font-size: 0.85rem;
+}
+
+.divider {
+    height: 1px;
+    border: 0;
+    margin: 16px 0;
+    background: var(--client-border);
+    opacity: 0.6;
+}
+
+.room-list {
+    display: grid;
+    gap: 10px;
+    margin: 12px 0 6px;
+}
+
+.room-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid var(--client-border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: rgba(15, 23, 42, 0.7);
+}
+
+.room-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.room-name {
+    font-weight: 600;
+    color: var(--client-fg);
+}
+
+.room-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--client-muted);
+    font-size: 0.85rem;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--client-border);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+}
+
+.pill-muted {
+    background: rgba(148, 163, 184, 0.15);
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 3px solid var(--client-border);
+    border-top-color: var(--client-accent);
+    animation: spin 0.8s linear infinite;
+    margin: 12px auto;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }

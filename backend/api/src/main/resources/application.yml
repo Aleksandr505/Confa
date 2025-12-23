@@ -34,3 +34,6 @@ livekit:
   apiKey: ${LIVEKIT_API_KEY:yourapikey}
   apiSecret: ${LIVEKIT_API_SECRET:yourapisecret}
   defaultRoom: demo
+
+app:
+  client-base-url: ${CLIENT_BASE_URL:http://localhost:5173}
