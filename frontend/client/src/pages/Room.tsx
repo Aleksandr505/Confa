@@ -461,13 +461,11 @@ export default function RoomPage() {
                     </div>
                 )}
                 {inviteInfo && (
-                    <div className="soft-alert" style={{ margin: '8px 12px' }}>
-                        <div style={{ fontWeight: 600, marginBottom: 4 }}>Приглашение готово</div>
-                        <div style={{ wordBreak: 'break-all', fontSize: 12, opacity: 0.8 }}>
-                            {inviteInfo.inviteUrl || inviteInfo.token}
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                            <button className="btn ghost small" type="button" onClick={handleCopyInvite}>
+                    <div className="soft-alert invite-box" style={{ margin: '8px 12px' }}>
+                        <div className="invite-box__title">Приглашение готово</div>
+                        <div className="invite-box__link">{inviteInfo.inviteUrl || inviteInfo.token}</div>
+                        <div className="invite-box__actions">
+                            <button className="btn primary small" type="button" onClick={handleCopyInvite}>
                                 {inviteCopied ? 'Скопировано' : 'Скопировать ссылку'}
                             </button>
                             <button className="btn ghost small" type="button" onClick={() => setInviteInfo(null)}>

@@ -139,9 +139,14 @@
 .divider {
     height: 1px;
     border: 0;
-    margin: 16px 0;
+    margin: 22px 0 18px;
     background: var(--client-border);
     opacity: 0.6;
+}
+
+.divider-spaced {
+    margin-top: 26px;
+    margin-bottom: 26px;
 }
 
 .room-list {

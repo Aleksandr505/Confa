@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { acceptInvite, createRoom, fetchMyRooms, type RoomAccess } from '../api';
+import { createRoom, fetchMyRooms, type RoomAccess } from '../api';
 import '../styles/login.css';
 
 function normalizeRoomName(raw: string) {
@@ -16,11 +16,7 @@ export default function HomePage() {
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
     const [roomName, setRoomName] = useState('my-room');
-    const [isPrivate, setIsPrivate] = useState(true);
     const [creating, setCreating] = useState(false);
-    const [inviteToken, setInviteToken] = useState('');
-    const [inviteError, setInviteError] = useState<string | null>(null);
-    const [inviteBusy, setInviteBusy] = useState(false);
     const nav = useNavigate();
 
     useEffect(() => {
@@ -53,33 +49,16 @@ export default function HomePage() {
         setErr(null);
         setCreating(true);
         try {
-            const room = await createRoom({ name: slug, isPrivate });
+            const room = await createRoom({ name: slug });
             setRooms(prev => [room, ...prev.filter(r => r.id !== room.id)]);
             nav(`/room/${encodeURIComponent(room.name)}`);
         } catch (e: any) {
-            setErr(e?.message || 'Не удалось создать комнату');
+            const message = typeof e?.message === 'string' && e.message.startsWith('409')
+                ? 'Такая комната уже существует. Выберите другое имя или попросите инвайт.'
+                : e?.message || 'Не удалось создать комнату';
+            setErr(message);
         } finally {
             setCreating(false);
-        }
-    }
-
-    async function onAcceptInvite(e: FormEvent) {
-        e.preventDefault();
-        const token = inviteToken.trim();
-        if (!token) {
-            setInviteError('Введите токен приглашения');
-            return;
-        }
-        setInviteBusy(true);
-        setInviteError(null);
-        try {
-            const room = await acceptInvite(token);
-            setRooms(prev => [room, ...prev.filter(r => r.id !== room.id)]);
-            nav(`/room/${encodeURIComponent(room.name)}`);
-        } catch (e: any) {
-            setInviteError(e?.message || 'Не удалось принять приглашение');
-        } finally {
-            setInviteBusy(false);
         }
     }
 
@@ -87,7 +66,7 @@ export default function HomePage() {
         <div className="auth-root client-theme">
             <div className="auth-card">
                 <h1 className="auth-title">Confa</h1>
-                <p className="auth-subtitle">Комнаты с вашим доступом</p>
+                <p className="auth-subtitle">Комнаты:</p>
 
                 {err && <div className="alert alert-error">{err}</div>}
                 {loading ? (
@@ -102,7 +81,6 @@ export default function HomePage() {
                                     <div className="room-name">{room.name}</div>
                                     <div className="room-meta">
                                         <span className="pill">{room.role === 'OWNER' ? 'Владелец' : 'Участник'}</span>
-                                        {room.isPrivate && <span className="pill pill-muted">Private</span>}
                                     </div>
                                 </div>
                                 <button
@@ -117,7 +95,7 @@ export default function HomePage() {
                     </div>
                 )}
 
-                <hr className="divider" />
+                <hr className="divider divider-spaced" />
 
                 <form className="auth-form" onSubmit={onCreateRoom}>
                     <label className="field">
@@ -131,40 +109,11 @@ export default function HomePage() {
                             placeholder="team-sync или demo"
                         />
                     </label>
-                    <label className="checkbox">
-                        <input
-                            type="checkbox"
-                            checked={isPrivate}
-                            onChange={e => setIsPrivate(e.target.checked)}
-                        />
-                        <span>Сделать комнату приватной (доступ только по инвайту)</span>
-                    </label>
                     <button className="btn primary" type="submit" disabled={creating}>
                         {creating ? 'Создаём…' : 'Создать и зайти'}
                     </button>
                 </form>
 
-                <form className="auth-form" onSubmit={onAcceptInvite}>
-                    <label className="field">
-                        <span>Есть приглашение?</span>
-                        <input
-                            value={inviteToken}
-                            onChange={e => {
-                                setInviteToken(e.target.value);
-                                setInviteError(null);
-                            }}
-                            placeholder="Вставьте токен приглашения"
-                        />
-                    </label>
-                    {inviteError && <div className="alert alert-error">{inviteError}</div>}
-                    <button className="btn ghost" type="submit" disabled={inviteBusy}>
-                        {inviteBusy ? 'Принимаем…' : 'Принять приглашение'}
-                    </button>
-                </form>
-
-                <button className="btn ghost small" type="button" onClick={loadRooms}>
-                    Обновить список
-                </button>
             </div>
         </div>
     );

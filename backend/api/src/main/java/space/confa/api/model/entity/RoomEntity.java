@@ -19,7 +19,6 @@ public class RoomEntity {
     private Long id;
     private String name;
     private Long ownerId;
-    private Boolean isPrivate;
     private Instant createdAt;
     private Instant updatedAt;
 }

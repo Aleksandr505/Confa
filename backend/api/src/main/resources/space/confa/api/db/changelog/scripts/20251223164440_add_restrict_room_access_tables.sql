@@ -7,7 +7,6 @@ create table room
     id         bigint auto_increment primary key,
     name       varchar(255)              not null,
     owner_id   bigint                    not null,
-    is_private tinyint(1) default 1      not null,
     created_at timestamp  default CURRENT_TIMESTAMP null,
     updated_at timestamp  default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
     constraint unique_room_name unique (name),

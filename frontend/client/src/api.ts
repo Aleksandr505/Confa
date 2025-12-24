@@ -28,7 +28,6 @@ export type RoomAccess = {
     id: number;
     name: string;
     role: 'OWNER' | 'MEMBER';
-    isPrivate: boolean;
 };
 
 export type RoomInvite = {
@@ -44,7 +43,7 @@ export async function fetchMyRooms(): Promise<RoomAccess[]> {
     return http<RoomAccess[]>('/rooms/my', { method: 'GET' });
 }
 
-export async function createRoom(payload: { name: string; isPrivate?: boolean }): Promise<RoomAccess> {
+export async function createRoom(payload: { name: string }): Promise<RoomAccess> {
     return http<RoomAccess>('/rooms', {
         method: 'POST',
         body: JSON.stringify(payload),

@@ -59,7 +59,6 @@ public class RoomAccessService {
                         RoomEntity.builder()
                                 .name(roomName)
                                 .ownerId(userId)
-                                .isPrivate(dto.isPrivate())
                                 .build()
                 ).flatMap(room -> roomMemberRepository.save(
                         RoomMemberEntity.builder()
@@ -73,7 +72,7 @@ public class RoomAccessService {
 
     public Flux<RoomAccessDto> getRoomsForUser(Long userId) {
         return databaseClient.sql("""
-                        SELECT r.id, r.name, r.is_private, rm.role
+                        SELECT r.id, r.name, rm.role
                         FROM room_member rm
                         JOIN room r ON r.id = rm.room_id
                         WHERE rm.user_id = :userId
@@ -83,8 +82,7 @@ public class RoomAccessService {
                 .map((row, metadata) -> new RoomAccessDto(
                         row.get("id", Long.class),
                         row.get("name", String.class),
-                        RoomMemberRole.valueOf(Objects.requireNonNull(row.get("role", String.class))),
-                        asBoolean(row.get("is_private"))
+                        RoomMemberRole.valueOf(Objects.requireNonNull(row.get("role", String.class)))
                 ))
                 .all();
     }
@@ -185,7 +183,7 @@ public class RoomAccessService {
     }
 
     private RoomAccessDto toAccessDto(RoomEntity room, RoomMemberRole role) {
-        return new RoomAccessDto(room.getId(), room.getName(), role, Boolean.TRUE.equals(room.getIsPrivate()));
+        return new RoomAccessDto(room.getId(), room.getName(), role);
     }
 
     private Mono<RoomAccessDto> ensureMemberAndBuildResponse(RoomInviteEntity invite, RoomMemberEntity member, boolean incrementUsage) {
@@ -223,13 +221,4 @@ public class RoomAccessService {
         }
     }
 
-    private boolean asBoolean(Object value) {
-        if (value instanceof Boolean b) {
-            return b;
-        }
-        if (value instanceof Number n) {
-            return n.intValue() != 0;
-        }
-        return false;
-    }
 }

@@ -165,7 +165,12 @@
 .lk-appbar.light {
     background: linear-gradient(180deg, #ffffff, #fafbff);
     border-bottom: 1px solid var(--lk-border-color);
-    color: #e5e7eb;
+    color: #0f172a;
+}
+
+.lk-appbar.light .brand-title {
+    color: inherit;
+    text-shadow: none;
 }
 
 .prejoin-main { min-height: 0; overflow: auto; padding: 16px; }
@@ -174,9 +179,9 @@
     margin: 0 0 12px;
     padding: 10px 12px;
     border-radius: 12px;
-    background: #fff7ed;
-    border: 1px solid #fed7aa;
-    color: #9a3412;
+    background: linear-gradient(180deg, #0b1220, #0f172a);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    color: #e2e8f0;
     font-size: 14px;
 }
 
@@ -517,4 +522,30 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: #e5e7eb;
+}
+
+.invite-box {
+    background: linear-gradient(160deg, rgba(15, 23, 42, 0.95), rgba(12, 18, 33, 0.92));
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+}
+
+.invite-box__title {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.invite-box__link {
+    word-break: break-all;
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+.invite-box__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
 }
