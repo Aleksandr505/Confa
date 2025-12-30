@@ -16,7 +16,13 @@ spring:
       max-life-time: 10m
       validation-query: select 1
       validation-depth: remote
-
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      repositories:
+        enabled: false
 
 security:
   password-encoder:

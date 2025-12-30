@@ -10,6 +10,7 @@ cat > deploy/.env <<'EOF'
 # Runtime/Compose
 API_IMAGE=yourusername/api:latest
 CLIENT_IMAGE=yourusername/client:latest
+ADMIN_CLIENT_IMAGE=yourusername/admin-client:latest
 
 APP_PORT=8080
 APP_NAME=api
@@ -26,9 +27,15 @@ PASSWORD_ENCODER_SECRET=change_me
 JWT_SECRET=change_me
 JWT_ACCESS_EXPIRATION=PT30M
 JWT_REFRESH_EXPIRATION=PT12H
+INIT_BOOTSTRAP_SERVICE_KEY=change_me
 
 LIVEKIT_API_KEY=change_me
 LIVEKIT_API_SECRET=change_me
+
+# Redis / invite links
+REDIS_HOST=redis
+REDIS_PORT=6379
+CLIENT_BASE_URL=http://client
 EOF
 
 # ---------- Build-time (Vite) ----------

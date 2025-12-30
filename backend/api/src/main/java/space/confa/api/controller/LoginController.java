@@ -14,6 +14,7 @@ import space.confa.api.configuration.properties.JWTProp;
 import space.confa.api.model.domain.AppHttpHeader;
 import space.confa.api.model.domain.exception.TooManyLoginAttemptsException;
 import space.confa.api.model.dto.request.AuthDto;
+import space.confa.api.service.IpBanService;
 import space.confa.api.service.LoginRateLimiter;
 import space.confa.api.service.LoginService;
 
@@ -30,6 +31,7 @@ public class LoginController {
     private final LoginService loginService;
     private final JWTProp jwtProp;
     private final LoginRateLimiter loginRateLimiter;
+    private final IpBanService ipBanService;
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<Void>> authenticate(
@@ -39,7 +41,8 @@ public class LoginController {
         String clientIp = resolveClientIp(request);
         String key = clientIp + ":" + authDto.username();
 
-        return loginRateLimiter.tryConsume(key)
+        return ipBanService.ensureIpAllowed(clientIp)
+                .then(loginRateLimiter.tryConsume(key))
                 .flatMap(allowed -> {
                     if (!allowed) {
                         return Mono.error(new TooManyLoginAttemptsException(
@@ -48,6 +51,7 @@ public class LoginController {
                     }
 
                     return loginService.authenticate(authDto)
+                            .onErrorResume(e -> ipBanService.registerFailure(clientIp, authDto.username()).then(Mono.error(e)))
                             .map(pair -> {
                                 ResponseCookie refreshCookie = ResponseCookie
                                         .from("refresh_token", pair.refreshToken())

@@ -46,6 +46,10 @@ services:
       - JWT_REFRESH_EXPIRATION=${JWT_REFRESH_EXPIRATION}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - INIT_BOOTSTRAP_SERVICE_KEY=${INIT_BOOTSTRAP_SERVICE_KEY}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - CLIENT_BASE_URL=${CLIENT_BASE_URL}
     expose:
       - "8080"
     networks: [shared_web]
@@ -54,6 +58,8 @@ services:
         condition: service_healthy
       liquibase-migrations:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   client:
     image: ${CLIENT_IMAGE}
@@ -92,6 +98,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: ["redis-server", "--save", "20", "1", "--loglevel", "warning"]
+    networks: [shared_web]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   liquibase-migrations:
     image: liquibase/liquibase:latest
     container_name: liquibase-migrations
@@ -117,6 +136,7 @@ volumes:
   caddy_data:
   caddy_config:
   mysql_data:
+  redis_data:
 
 # Before start docker-compose create network:
 # docker network ls
