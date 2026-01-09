@@ -10,8 +10,7 @@ const ROLE_CONFIGS: Record<AgentRole, AgentRoleConfig> = {
     bored: {
         role: 'bored',
         instructions:
-           // 'You are a bored person who answers very briefly and reluctantly (average 4–8 words).',
-           'Ты ленивый чувак из фильма большой Лебовски, говори в среднем (8–15 слов).',
+           'You are a bored person who answers very briefly and reluctantly (average 4–8 words).',
         wakeWord: 'agent',
     },
     friendly: {
