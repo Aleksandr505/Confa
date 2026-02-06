@@ -58,7 +58,7 @@ import {
 import '../styles/livekit-theme.css';
 import { getUserIdentity, isAdmin } from '../lib/auth.ts';
 import { getAvatarColor, getAvatarUrl } from '../lib/avatar';
-import { Track } from 'livekit-client';
+import { ParticipantEvent, Track } from 'livekit-client';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 
@@ -907,9 +907,12 @@ function BrandedVideoConference() {
         unreadMessages: 0,
         showSettings: false,
     });
+    const [isDeafened, setIsDeafened] = useState(false);
+    const [restoreMicState, setRestoreMicState] = useState<boolean | null>(null);
     const lastAutoFocusedScreenShareTrack = useRef<TrackReferenceOrPlaceholder | null>(null);
     const layoutContext = useCreateLayoutContext();
     const [screenShareError, setScreenShareError] = useState<string | null>(null);
+    const room = useRoomContext();
 
     const tracks = useTracks(
         [
@@ -968,7 +971,52 @@ function BrandedVideoConference() {
         tracks,
     ]);
 
+    useEffect(() => {
+        if (!room) return;
+        if (isDeafened) {
+            const wasEnabled = room.localParticipant.isMicrophoneEnabled;
+            setRestoreMicState(prev => prev ?? wasEnabled);
+            void room.localParticipant.setMicrophoneEnabled(false);
+            return;
+        }
+        if (restoreMicState !== null) {
+            void room.localParticipant.setMicrophoneEnabled(restoreMicState);
+            setRestoreMicState(null);
+        }
+    }, [isDeafened, restoreMicState, room]);
 
+    useEffect(() => {
+        if (!room) return;
+        const participant = room.localParticipant;
+        const handleUnmuted = (publication: { source: Track.Source }) => {
+            if (!isDeafened) return;
+            if (publication.source === Track.Source.Microphone) {
+                void participant.setMicrophoneEnabled(false);
+            }
+        };
+        participant.on(ParticipantEvent.TrackUnmuted, handleUnmuted);
+        return () => {
+            participant.off(ParticipantEvent.TrackUnmuted, handleUnmuted);
+        };
+    }, [isDeafened, room]);
+
+    useEffect(() => {
+        const micToggle = document.querySelector<HTMLButtonElement>(
+            '[data-lk-control-bar] button[data-lk-source="microphone"]',
+        );
+        if (!micToggle) return;
+        if (isDeafened) {
+            micToggle.setAttribute('disabled', 'true');
+            micToggle.setAttribute('aria-disabled', 'true');
+        } else {
+            micToggle.removeAttribute('disabled');
+            micToggle.setAttribute('aria-disabled', 'false');
+        }
+    }, [isDeafened]);
+
+    const toggleDeafen = () => {
+        setIsDeafened(current => !current);
+    };
 
     return (
         <div className="lk-video-conference">
@@ -992,17 +1040,31 @@ function BrandedVideoConference() {
                             </FocusLayoutContainer>
                         </div>
                     )}
-                    <ControlBar
-                        controls={{ chat: true, screenShare: true }}
-                        onDeviceError={({ source, error }) => {
-                            if (source === Track.Source.ScreenShare) {
-                                setScreenShareError(
-                                    error?.message ||
-                                        'Не удалось включить демонстрацию экрана. Проверьте разрешения браузера.',
-                                );
-                            }
-                        }}
-                    />
+                    <div className="lk-control-bar-row" data-lk-control-bar data-audio-off={isDeafened ? 'true' : 'false'}>
+                        <ControlBar
+                            className="lk-control-bar--main"
+                            controls={{ chat: true, screenShare: true }}
+                            onDeviceError={({ source, error }) => {
+                                if (source === Track.Source.ScreenShare) {
+                                    setScreenShareError(
+                                        error?.message ||
+                                            'Не удалось включить демонстрацию экрана. Проверьте разрешения браузера.',
+                                    );
+                                }
+                            }}
+                        />
+                        <button
+                            type="button"
+                            className="lk-button lk-deafen-button"
+                            aria-pressed={isDeafened}
+                            data-lk-enabled={isDeafened}
+                            onClick={toggleDeafen}
+                            title={isDeafened ? 'Audio off enabled' : 'Audio off'}
+                        >
+                            <DeafenIcon muted={isDeafened} />
+                            <span>Audio off</span>
+                        </button>
+                    </div>
                 </div>
                 {screenShareError && (
                     <div className="soft-alert" style={{ margin: '6px 12px' }}>
@@ -1019,9 +1081,34 @@ function BrandedVideoConference() {
                 )}
                 <Chat style={{ display: widgetState.showChat ? 'grid' : 'none' }} />
             </LayoutContextProvider>
-            <RoomAudioRenderer />
+            <RoomAudioRenderer muted={isDeafened} />
             <ConnectionStateToast />
         </div>
+    );
+}
+
+function DeafenIcon({ muted }: { muted: boolean }) {
+    return (
+        <svg
+            className="lk-deafen-icon"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+        >
+            <path d="M3.5 8.5h3l4-3.5v10l-4-3.5h-3z" />
+            {muted ? (
+                <path d="M13.5 7.5l3 3m0-3l-3 3" />
+            ) : (
+                <>
+                    <path d="M13.6 8.2c.7.6 1 1.2 1 1.8s-.3 1.2-1 1.8" />
+                    <path d="M15.7 6.7c1.4 1.1 2 2.4 2 3.3s-.6 2.2-2 3.3" />
+                </>
+            )}
+        </svg>
     );
 }
 
