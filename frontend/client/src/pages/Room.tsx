@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type Dispatch,
+    type SetStateAction,
+} from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     AudioTrack,
@@ -76,6 +86,13 @@ type PermIssue = {
     message?: string;
 };
 
+type AudioControlState = {
+    isDeafened: boolean;
+    volumes: Record<string, number>;
+};
+
+const AudioControlContext = createContext<AudioControlState | null>(null);
+
 export default function RoomPage() {
     const { roomId = 'demo' } = useParams();
     const navigate = useNavigate();
@@ -104,6 +121,7 @@ export default function RoomPage() {
     const [inviteError, setInviteError] = useState<string | null>(null);
     const [inviteBusy, setInviteBusy] = useState(false);
     const [inviteCopied, setInviteCopied] = useState(false);
+    const [volumes, setVolumes] = useState<Record<string, number>>({});
 
     const isAdminUser = isAdmin();
 
@@ -618,11 +636,16 @@ export default function RoomPage() {
 
 
                 <PermissionBanner issue={permIssue} clearIssue={() => setPermIssue(null)} />
-                <VolumesPanel open={volumePanelOpen} onClose={() => setVolumePanelOpen(false)} />
+                <VolumesPanel
+                    open={volumePanelOpen}
+                    onClose={() => setVolumePanelOpen(false)}
+                    volumes={volumes}
+                    setVolumes={setVolumes}
+                />
                 <ParticipantJoinTone />
 
                 <main className="lk-main">
-                    <BrandedVideoConference />
+                    <BrandedVideoConference volumes={volumes} />
                 </main>
 
                 <StartAudio label="Включить звук в браузере" />
@@ -631,9 +654,18 @@ export default function RoomPage() {
     );
 }
 
-function VolumesPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+function VolumesPanel({
+    open,
+    onClose,
+    volumes,
+    setVolumes,
+}: {
+    open: boolean;
+    onClose: () => void;
+    volumes: Record<string, number>;
+    setVolumes: Dispatch<SetStateAction<Record<string, number>>>;
+}) {
     const participants = useRemoteParticipants();
-    const [volumes, setVolumes] = useState<Record<string, number>>({});
 
     useEffect(() => {
         for (const p of participants) {
@@ -803,6 +835,7 @@ function BrandedTileContent() {
     const trackRef = useMaybeTrackRefContext();
     const layoutContext = useMaybeLayoutContext();
     const autoManageSubscription = useFeatureContext()?.autoSubscription;
+    const audioControls = useContext(AudioControlContext);
 
     const handleSubscribe = useCallback(
         (subscribed: boolean) => {
@@ -828,6 +861,8 @@ function BrandedTileContent() {
     const avatarUrl = getAvatarUrl(participant.identity, participant.name);
     const isScreenShare = trackRef.source === Track.Source.ScreenShare;
     const micPublication = participant.getTrackPublication(Track.Source.Microphone);
+    const volume = audioControls?.volumes[participant.identity] ?? 0.5;
+    const isAudioOff = audioControls?.isDeafened ?? false;
 
     const isVideoTrack =
         isTrackReference(trackRef) &&
@@ -843,6 +878,8 @@ function BrandedTileContent() {
                     trackRef={trackRef}
                     onSubscriptionStatusChanged={handleSubscribe}
                     manageSubscription={autoManageSubscription}
+                    muted={isScreenShare ? isAudioOff || volume <= 0 : undefined}
+                    volume={isScreenShare ? (isAudioOff ? 0 : volume) : undefined}
                 />
             )}
             {isAudioTrack && (
@@ -901,7 +938,7 @@ function BrandedParticipantTile(props: ParticipantTileProps) {
     );
 }
 
-function BrandedVideoConference() {
+function BrandedVideoConference({ volumes }: { volumes: Record<string, number> }) {
     const [widgetState, setWidgetState] = useState<WidgetState>({
         showChat: false,
         unreadMessages: 0,
@@ -1019,7 +1056,8 @@ function BrandedVideoConference() {
     };
 
     return (
-        <div className="lk-video-conference">
+        <AudioControlContext.Provider value={{ isDeafened, volumes }}>
+            <div className="lk-video-conference">
             <LayoutContextProvider value={layoutContext} onWidgetChange={state => setWidgetState(state)}>
                 <div className="lk-video-conference-inner">
                     {!focusTrack ? (
@@ -1083,7 +1121,8 @@ function BrandedVideoConference() {
             </LayoutContextProvider>
             <RoomAudioRenderer muted={isDeafened} />
             <ConnectionStateToast />
-        </div>
+            </div>
+        </AudioControlContext.Provider>
     );
 }
 
