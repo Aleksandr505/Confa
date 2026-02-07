@@ -113,6 +113,50 @@ export default function RoomPage() {
 
     useEffect(() => {
         if (!roomId) return;
+        const volumeKey = `confa:volumes:${roomId}`;
+        const screenShareKey = `confa:screenShareVolumes:${roomId}`;
+        try {
+            const raw = localStorage.getItem(volumeKey);
+            if (raw) {
+                const parsed = JSON.parse(raw) as Record<string, number>;
+                setVolumes(parsed);
+            }
+        } catch (e) {
+            console.warn('Failed to load volume settings', e);
+        }
+        try {
+            const raw = localStorage.getItem(screenShareKey);
+            if (raw) {
+                const parsed = JSON.parse(raw) as Record<string, number>;
+                setScreenShareVolumes(parsed);
+            }
+        } catch (e) {
+            console.warn('Failed to load screen share volume settings', e);
+        }
+    }, [roomId]);
+
+    useEffect(() => {
+        if (!roomId) return;
+        const volumeKey = `confa:volumes:${roomId}`;
+        try {
+            localStorage.setItem(volumeKey, JSON.stringify(volumes));
+        } catch (e) {
+            console.warn('Failed to save volume settings', e);
+        }
+    }, [roomId, volumes]);
+
+    useEffect(() => {
+        if (!roomId) return;
+        const screenShareKey = `confa:screenShareVolumes:${roomId}`;
+        try {
+            localStorage.setItem(screenShareKey, JSON.stringify(screenShareVolumes));
+        } catch (e) {
+            console.warn('Failed to save screen share volume settings', e);
+        }
+    }, [roomId, screenShareVolumes]);
+
+    useEffect(() => {
+        if (!roomId) return;
         fetchMyRooms()
             .then(list => setRoomAccess(list.find(r => r.name === roomId) || null))
             .catch(() => {});
@@ -662,6 +706,15 @@ function VolumesPanel({
     )
         .filter(isTrackReference)
         .filter(track => track.publication.source === Track.Source.ScreenShareAudio);
+    const screenShareAudioByParticipant = useMemo(() => {
+        const unique = new Map<string, TrackReferenceOrPlaceholder>();
+        for (const track of screenShareAudioTracks) {
+            if (!unique.has(track.participant.identity)) {
+                unique.set(track.participant.identity, track);
+            }
+        }
+        return Array.from(unique.values());
+    }, [screenShareAudioTracks]);
 
     useEffect(() => {
         for (const p of participants) {
@@ -686,24 +739,13 @@ function VolumesPanel({
     }, [participants, volumes]);
 
     useEffect(() => {
-        const known = new Set(participants.map(p => p.identity));
-        setVolumes(current => {
-            const stale = Object.keys(current).filter(id => !known.has(id));
-            if (stale.length === 0) return current;
-            const next = { ...current };
-            stale.forEach(id => delete next[id]);
-            return next;
-        });
-    }, [participants]);
-
-    useEffect(() => {
         let changed = false;
         const next = { ...screenShareVolumes };
         for (const track of screenShareAudioTracks) {
-            const trackId = track.publication.trackSid;
-            if (next[trackId] === undefined) {
-                next[trackId] = 0.5;
-                const audioTrack = track.publication.track;
+            const identity = track.participant.identity;
+            if (next[identity] === undefined) {
+                next[identity] = 0.5;
+                const audioTrack = track.publication?.track;
                 if (audioTrack && audioTrack.kind === Track.Kind.Audio && typeof (audioTrack as any).setVolume === 'function') {
                     (audioTrack as any).setVolume(0.5);
                 }
@@ -714,20 +756,9 @@ function VolumesPanel({
     }, [screenShareAudioTracks, screenShareVolumes, setScreenShareVolumes]);
 
     useEffect(() => {
-        const known = new Set(screenShareAudioTracks.map(track => track.publication.trackSid));
-        setScreenShareVolumes(current => {
-            const stale = Object.keys(current).filter(id => !known.has(id));
-            if (stale.length === 0) return current;
-            const next = { ...current };
-            stale.forEach(id => delete next[id]);
-            return next;
-        });
-    }, [screenShareAudioTracks, setScreenShareVolumes]);
-
-    useEffect(() => {
         for (const track of screenShareAudioTracks) {
-            const volume = screenShareVolumes[track.publication.trackSid];
-            const audioTrack = track.publication.track;
+            const volume = screenShareVolumes[track.participant.identity];
+            const audioTrack = track.publication?.track;
             if (
                 volume !== undefined &&
                 audioTrack &&
@@ -790,16 +821,16 @@ function VolumesPanel({
                     })}
                 </div>
             )}
-            {screenShareAudioTracks.length > 0 && (
+            {screenShareAudioByParticipant.length > 0 && (
                 <>
                     <div className="volume-panel__subhead">Демонстрация экрана</div>
                     <div className="volume-panel__list">
-                        {screenShareAudioTracks.map(track => {
-                            const trackId = track.publication.trackSid;
-                            const currentVolume = screenShareVolumes[trackId] ?? 0.5;
+                        {screenShareAudioByParticipant.map(track => {
+                            const identity = track.participant.identity;
+                            const currentVolume = screenShareVolumes[identity] ?? 0.5;
                             const label = track.participant.name || track.participant.identity;
                             return (
-                                <div className="volume-row" key={trackId}>
+                                <div className="volume-row" key={identity}>
                                     <div className="volume-row__title" title={label}>
                                         <span
                                             className="avatar-icon"
@@ -822,8 +853,8 @@ function VolumesPanel({
                                             value={currentVolume}
                                             onChange={e => {
                                                 const next = Number(e.target.value);
-                                                setScreenShareVolumes(map => ({ ...map, [trackId]: next }));
-                                                const audioTrack = track.publication.track;
+                                                setScreenShareVolumes(map => ({ ...map, [identity]: next }));
+                                                const audioTrack = track.publication?.track;
                                                 if (
                                                     audioTrack &&
                                                     audioTrack.kind === Track.Kind.Audio &&
