@@ -10,6 +10,7 @@ import reactor.core.publisher.Mono;
 import space.confa.api.model.dto.request.CreateInviteDto;
 import space.confa.api.model.dto.request.CreateRoomDto;
 import space.confa.api.model.dto.response.RoomAccessDto;
+import space.confa.api.model.dto.response.RoomAccessSummaryDto;
 import space.confa.api.model.dto.response.RoomInviteDto;
 import space.confa.api.service.RoomAccessService;
 
@@ -23,6 +24,11 @@ public class RoomAccessController {
     @GetMapping("/my")
     public Flux<RoomAccessDto> getMyRooms(@AuthenticationPrincipal Jwt jwt) {
         return roomAccessService.getRoomsForUser(getUserId(jwt));
+    }
+
+    @GetMapping("/my/summary")
+    public Flux<RoomAccessSummaryDto> getMyRoomsSummary(@AuthenticationPrincipal Jwt jwt) {
+        return roomAccessService.getRoomsForUserWithStats(getUserId(jwt));
     }
 
     @PostMapping

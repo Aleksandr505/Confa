@@ -198,6 +198,43 @@
     background: rgba(148, 163, 184, 0.15);
 }
 
+.pill-online {
+    border-color: rgba(34, 197, 94, 0.6);
+    color: #bbf7d0;
+    background: rgba(34, 197, 94, 0.16);
+}
+
+.room-tooltip {
+    position: relative;
+}
+
+.room-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.95);
+    color: #e2e8f0;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    font-size: 0.72rem;
+    line-height: 1.2;
+    white-space: pre-wrap;
+    max-width: 260px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+    z-index: 5;
+}
+
+.room-tooltip:hover::after,
+.room-tooltip:focus-visible::after {
+    opacity: 1;
+}
+
 .spinner {
     width: 32px;
     height: 32px;

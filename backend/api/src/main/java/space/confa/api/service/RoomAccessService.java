@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import space.confa.api.configuration.properties.AppProp;
 import space.confa.api.infrastructure.db.repository.RoomInviteRepository;
 import space.confa.api.infrastructure.db.repository.RoomMemberRepository;
@@ -18,6 +19,7 @@ import space.confa.api.model.dto.request.AcceptInviteDto;
 import space.confa.api.model.dto.request.CreateInviteDto;
 import space.confa.api.model.dto.request.CreateRoomDto;
 import space.confa.api.model.dto.response.RoomAccessDto;
+import space.confa.api.model.dto.response.RoomAccessSummaryDto;
 import space.confa.api.model.dto.response.RoomInviteDto;
 import space.confa.api.model.entity.RoomEntity;
 import space.confa.api.model.entity.RoomInviteEntity;
@@ -31,6 +33,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
 
 @Slf4j
@@ -47,6 +50,7 @@ public class RoomAccessService {
     private final RoomInviteRepository roomInviteRepository;
     private final DatabaseClient databaseClient;
     private final AppProp appProp;
+    private final RoomService roomService;
 
     @Transactional
     public Mono<RoomAccessDto> createRoom(Long userId, CreateRoomDto dto) {
@@ -85,6 +89,34 @@ public class RoomAccessService {
                         RoomMemberRole.valueOf(Objects.requireNonNull(row.get("role", String.class)))
                 ))
                 .all();
+    }
+
+    public Flux<RoomAccessSummaryDto> getRoomsForUserWithStats(Long userId) {
+        return getRoomsForUser(userId)
+                .flatMapSequential(room -> Mono.fromCallable(() -> roomService.getParticipantsByRoom(room.name()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(participants -> {
+                            List<String> names = participants.stream()
+                                    .map(p -> p.name() != null && !p.name().isBlank() ? p.name() : p.identity())
+                                    .distinct()
+                                    .toList();
+                            return new RoomAccessSummaryDto(
+                                    room.id(),
+                                    room.name(),
+                                    room.role(),
+                                    participants.size(),
+                                    names
+                            );
+                        })
+                        .onErrorResume(e -> Mono.just(new RoomAccessSummaryDto(
+                                room.id(),
+                                room.name(),
+                                room.role(),
+                                0,
+                                List.of()
+                        ))),
+                        4
+                );
     }
 
     public Mono<Void> checkUserCanJoin(Long userId, String roomName) {

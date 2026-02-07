@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createRoom, fetchMyRooms, type RoomAccess } from '../api';
+import { createRoom, fetchMyRoomsSummary, type RoomAccessSummary } from '../api';
 import '../styles/login.css';
 
 function normalizeRoomName(raw: string) {
@@ -12,12 +12,32 @@ function normalizeRoomName(raw: string) {
 }
 
 export default function HomePage() {
-    const [rooms, setRooms] = useState<RoomAccess[]>([]);
+    const [rooms, setRooms] = useState<RoomAccessSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
     const [roomName, setRoomName] = useState('my-room');
     const [creating, setCreating] = useState(false);
     const nav = useNavigate();
+
+    const loadRoomOrder = () => {
+        try {
+            const raw = localStorage.getItem('confa:roomLastVisited');
+            return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+        } catch (e) {
+            console.warn('Failed to load room order', e);
+            return {};
+        }
+    };
+
+    const storeRoomVisit = (name: string) => {
+        try {
+            const order = loadRoomOrder();
+            order[name] = Date.now();
+            localStorage.setItem('confa:roomLastVisited', JSON.stringify(order));
+        } catch (e) {
+            console.warn('Failed to store room order', e);
+        }
+    };
 
     useEffect(() => {
         loadRooms();
@@ -27,8 +47,15 @@ export default function HomePage() {
         setLoading(true);
         setErr(null);
         try {
-            const list = await fetchMyRooms();
-            setRooms(list);
+            const list = await fetchMyRoomsSummary();
+            const order = loadRoomOrder();
+            const sorted = list.slice().sort((a, b) => {
+                const aOrder = order[a.name] ?? 0;
+                const bOrder = order[b.name] ?? 0;
+                if (aOrder === bOrder) return 0;
+                return bOrder - aOrder;
+            });
+            setRooms(sorted);
             if (list.length === 0) {
                 setRoomName('my-room');
             }
@@ -50,7 +77,13 @@ export default function HomePage() {
         setCreating(true);
         try {
             const room = await createRoom({ name: slug });
-            setRooms(prev => [room, ...prev.filter(r => r.id !== room.id)]);
+            const summary: RoomAccessSummary = {
+                ...room,
+                participantCount: 0,
+                participantNames: [],
+            };
+            storeRoomVisit(room.name);
+            setRooms(prev => [summary, ...prev.filter(r => r.id !== room.id)]);
             nav(`/room/${encodeURIComponent(room.name)}`);
         } catch (e: any) {
             const message = typeof e?.message === 'string' && e.message.startsWith('409')
@@ -75,23 +108,39 @@ export default function HomePage() {
                     <div className="alert">У вас пока нет комнат. Создайте личную комнату ниже или примите приглашение.</div>
                 ) : (
                     <div className="room-list">
-                        {rooms.map(room => (
+                        {rooms.map(room => {
+                            const names = (room.participantNames || []).filter(Boolean);
+                            const tooltip =
+                                names.length > 0 ? names.join(', ') : 'Сейчас в комнате никого нет';
+                            const hasParticipants = (room.participantCount ?? 0) > 0;
+                            return (
                             <div className="room-row" key={room.id}>
                                 <div className="room-info">
                                     <div className="room-name">{room.name}</div>
                                     <div className="room-meta">
                                         <span className="pill">{room.role === 'OWNER' ? 'Владелец' : 'Участник'}</span>
+                                        <span
+                                            className={`pill pill-muted room-tooltip${hasParticipants ? ' pill-online' : ''}`}
+                                            title={tooltip}
+                                            data-tooltip={tooltip}
+                                        >
+                                            {room.participantCount ?? 0} online
+                                        </span>
                                     </div>
                                 </div>
                                 <button
                                     className="btn primary"
                                     type="button"
-                                    onClick={() => nav(`/room/${encodeURIComponent(room.name)}`)}
+                                    onClick={() => {
+                                        storeRoomVisit(room.name);
+                                        nav(`/room/${encodeURIComponent(room.name)}`);
+                                    }}
                                 >
                                     Перейти
                                 </button>
                             </div>
-                        ))}
+                        );
+                        })}
                     </div>
                 )}
 

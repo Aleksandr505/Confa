@@ -30,6 +30,11 @@ export type RoomAccess = {
     role: 'OWNER' | 'MEMBER';
 };
 
+export type RoomAccessSummary = RoomAccess & {
+    participantCount: number;
+    participantNames: string[];
+};
+
 export type RoomInvite = {
     token: string;
     inviteUrl?: string | null;
@@ -41,6 +46,10 @@ export type RoomInvite = {
 
 export async function fetchMyRooms(): Promise<RoomAccess[]> {
     return http<RoomAccess[]>('/rooms/my', { method: 'GET' });
+}
+
+export async function fetchMyRoomsSummary(): Promise<RoomAccessSummary[]> {
+    return http<RoomAccessSummary[]>('/rooms/my/summary', { method: 'GET' });
 }
 
 export async function createRoom(payload: { name: string }): Promise<RoomAccess> {
