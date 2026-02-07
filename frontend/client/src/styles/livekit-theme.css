@@ -391,6 +391,14 @@
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     margin-top: 8px;
 }
+.volume-panel__subhead {
+    margin-top: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: rgba(226, 232, 240, 0.7);
+}
 
 .volume-row {
     background: rgba(31, 41, 55, 0.85);

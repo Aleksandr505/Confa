@@ -1,14 +1,4 @@
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type Dispatch,
-    type SetStateAction,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     AudioTrack,
@@ -86,13 +76,6 @@ type PermIssue = {
     message?: string;
 };
 
-type AudioControlState = {
-    isDeafened: boolean;
-    volumes: Record<string, number>;
-};
-
-const AudioControlContext = createContext<AudioControlState | null>(null);
-
 export default function RoomPage() {
     const { roomId = 'demo' } = useParams();
     const navigate = useNavigate();
@@ -122,6 +105,7 @@ export default function RoomPage() {
     const [inviteBusy, setInviteBusy] = useState(false);
     const [inviteCopied, setInviteCopied] = useState(false);
     const [volumes, setVolumes] = useState<Record<string, number>>({});
+    const [screenShareVolumes, setScreenShareVolumes] = useState<Record<string, number>>({});
 
     const isAdminUser = isAdmin();
 
@@ -641,11 +625,13 @@ export default function RoomPage() {
                     onClose={() => setVolumePanelOpen(false)}
                     volumes={volumes}
                     setVolumes={setVolumes}
+                    screenShareVolumes={screenShareVolumes}
+                    setScreenShareVolumes={setScreenShareVolumes}
                 />
                 <ParticipantJoinTone />
 
                 <main className="lk-main">
-                    <BrandedVideoConference volumes={volumes} />
+                    <BrandedVideoConference />
                 </main>
 
                 <StartAudio label="Включить звук в браузере" />
@@ -659,13 +645,23 @@ function VolumesPanel({
     onClose,
     volumes,
     setVolumes,
+    screenShareVolumes,
+    setScreenShareVolumes,
 }: {
     open: boolean;
     onClose: () => void;
     volumes: Record<string, number>;
     setVolumes: Dispatch<SetStateAction<Record<string, number>>>;
+    screenShareVolumes: Record<string, number>;
+    setScreenShareVolumes: Dispatch<SetStateAction<Record<string, number>>>;
 }) {
     const participants = useRemoteParticipants();
+    const screenShareAudioTracks = useTracks(
+        [{ source: Track.Source.ScreenShareAudio, withPlaceholder: false }],
+        { onlySubscribed: false },
+    )
+        .filter(isTrackReference)
+        .filter(track => track.publication.source === Track.Source.ScreenShareAudio);
 
     useEffect(() => {
         for (const p of participants) {
@@ -699,6 +695,49 @@ function VolumesPanel({
             return next;
         });
     }, [participants]);
+
+    useEffect(() => {
+        let changed = false;
+        const next = { ...screenShareVolumes };
+        for (const track of screenShareAudioTracks) {
+            const trackId = track.publication.trackSid;
+            if (next[trackId] === undefined) {
+                next[trackId] = 0.5;
+                const audioTrack = track.publication.track;
+                if (audioTrack && audioTrack.kind === Track.Kind.Audio && typeof (audioTrack as any).setVolume === 'function') {
+                    (audioTrack as any).setVolume(0.5);
+                }
+                changed = true;
+            }
+        }
+        if (changed) setScreenShareVolumes(next);
+    }, [screenShareAudioTracks, screenShareVolumes, setScreenShareVolumes]);
+
+    useEffect(() => {
+        const known = new Set(screenShareAudioTracks.map(track => track.publication.trackSid));
+        setScreenShareVolumes(current => {
+            const stale = Object.keys(current).filter(id => !known.has(id));
+            if (stale.length === 0) return current;
+            const next = { ...current };
+            stale.forEach(id => delete next[id]);
+            return next;
+        });
+    }, [screenShareAudioTracks, setScreenShareVolumes]);
+
+    useEffect(() => {
+        for (const track of screenShareAudioTracks) {
+            const volume = screenShareVolumes[track.publication.trackSid];
+            const audioTrack = track.publication.track;
+            if (
+                volume !== undefined &&
+                audioTrack &&
+                audioTrack.kind === Track.Kind.Audio &&
+                typeof (audioTrack as any).setVolume === 'function'
+            ) {
+                (audioTrack as any).setVolume(volume);
+            }
+        }
+    }, [screenShareAudioTracks, screenShareVolumes]);
 
     if (!open) return null;
 
@@ -750,6 +789,59 @@ function VolumesPanel({
                         );
                     })}
                 </div>
+            )}
+            {screenShareAudioTracks.length > 0 && (
+                <>
+                    <div className="volume-panel__subhead">Демонстрация экрана</div>
+                    <div className="volume-panel__list">
+                        {screenShareAudioTracks.map(track => {
+                            const trackId = track.publication.trackSid;
+                            const currentVolume = screenShareVolumes[trackId] ?? 0.5;
+                            const label = track.participant.name || track.participant.identity;
+                            return (
+                                <div className="volume-row" key={trackId}>
+                                    <div className="volume-row__title" title={label}>
+                                        <span
+                                            className="avatar-icon"
+                                            style={{
+                                                backgroundImage: `url(${getAvatarUrl(
+                                                    track.participant.identity,
+                                                    track.participant.name,
+                                                )})`,
+                                            }}
+                                            aria-hidden
+                                        />
+                                        {label}&nbsp;·&nbsp;Screen share audio
+                                    </div>
+                                    <div className="volume-row__controls">
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={1}
+                                            step={0.01}
+                                            value={currentVolume}
+                                            onChange={e => {
+                                                const next = Number(e.target.value);
+                                                setScreenShareVolumes(map => ({ ...map, [trackId]: next }));
+                                                const audioTrack = track.publication.track;
+                                                if (
+                                                    audioTrack &&
+                                                    audioTrack.kind === Track.Kind.Audio &&
+                                                    typeof (audioTrack as any).setVolume === 'function'
+                                                ) {
+                                                    (audioTrack as any).setVolume(next);
+                                                }
+                                            }}
+                                        />
+                                        <span className="volume-row__value">
+                                            {Math.round(currentVolume * 100)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </>
             )}
         </div>
     );
@@ -835,7 +927,6 @@ function BrandedTileContent() {
     const trackRef = useMaybeTrackRefContext();
     const layoutContext = useMaybeLayoutContext();
     const autoManageSubscription = useFeatureContext()?.autoSubscription;
-    const audioControls = useContext(AudioControlContext);
 
     const handleSubscribe = useCallback(
         (subscribed: boolean) => {
@@ -861,8 +952,6 @@ function BrandedTileContent() {
     const avatarUrl = getAvatarUrl(participant.identity, participant.name);
     const isScreenShare = trackRef.source === Track.Source.ScreenShare;
     const micPublication = participant.getTrackPublication(Track.Source.Microphone);
-    const volume = audioControls?.volumes[participant.identity] ?? 0.5;
-    const isAudioOff = audioControls?.isDeafened ?? false;
 
     const isVideoTrack =
         isTrackReference(trackRef) &&
@@ -878,8 +967,7 @@ function BrandedTileContent() {
                     trackRef={trackRef}
                     onSubscriptionStatusChanged={handleSubscribe}
                     manageSubscription={autoManageSubscription}
-                    muted={isScreenShare ? isAudioOff || volume <= 0 : undefined}
-                    volume={isScreenShare ? (isAudioOff ? 0 : volume) : undefined}
+                    muted={isScreenShare ? false : undefined}
                 />
             )}
             {isAudioTrack && (
@@ -938,7 +1026,7 @@ function BrandedParticipantTile(props: ParticipantTileProps) {
     );
 }
 
-function BrandedVideoConference({ volumes }: { volumes: Record<string, number> }) {
+function BrandedVideoConference() {
     const [widgetState, setWidgetState] = useState<WidgetState>({
         showChat: false,
         unreadMessages: 0,
@@ -1056,8 +1144,7 @@ function BrandedVideoConference({ volumes }: { volumes: Record<string, number> }
     };
 
     return (
-        <AudioControlContext.Provider value={{ isDeafened, volumes }}>
-            <div className="lk-video-conference">
+        <div className="lk-video-conference">
             <LayoutContextProvider value={layoutContext} onWidgetChange={state => setWidgetState(state)}>
                 <div className="lk-video-conference-inner">
                     {!focusTrack ? (
@@ -1121,8 +1208,7 @@ function BrandedVideoConference({ volumes }: { volumes: Record<string, number> }
             </LayoutContextProvider>
             <RoomAudioRenderer muted={isDeafened} />
             <ConnectionStateToast />
-            </div>
-        </AudioControlContext.Provider>
+        </div>
     );
 }
 
