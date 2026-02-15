@@ -1,0 +1,423 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
+import {
+    type ChannelDto,
+    type DmSummary,
+    type WorkspaceDto,
+    createWorkspace,
+    createWorkspaceChannel,
+    fetchDmList,
+    fetchWorkspaceChannels,
+    fetchWorkspaces,
+} from '../api';
+
+type AppShellState = {
+    workspaces: WorkspaceDto[];
+    channels: ChannelDto[];
+    dms: DmSummary[];
+    activeWorkspace?: WorkspaceDto;
+    loadingWorkspaces: boolean;
+    loadingChannels: boolean;
+    loadingDms: boolean;
+    refreshWorkspaces: () => Promise<void>;
+    refreshDms: () => Promise<void>;
+    openWorkspace: (workspaceId: number) => Promise<void>;
+};
+
+const AppShellContext = createContext<AppShellState | null>(null);
+
+function slugify(value: string) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9_-]/g, '');
+}
+
+export function useAppShell() {
+    const ctx = useContext(AppShellContext);
+    if (!ctx) throw new Error('AppShellContext is not available');
+    return ctx;
+}
+
+export default function AppShellLayout() {
+    const navigate = useNavigate();
+    const { workspaceId, channelId, peerId } = useParams();
+
+    const [workspaces, setWorkspaces] = useState<WorkspaceDto[]>([]);
+    const [channels, setChannels] = useState<ChannelDto[]>([]);
+    const [dms, setDms] = useState<DmSummary[]>([]);
+    const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
+    const [loadingChannels, setLoadingChannels] = useState(false);
+    const [loadingDms, setLoadingDms] = useState(true);
+    const [workspaceModalOpen, setWorkspaceModalOpen] = useState(false);
+    const [channelModalOpen, setChannelModalOpen] = useState(false);
+    const [workspaceName, setWorkspaceName] = useState('');
+    const [workspaceSlug, setWorkspaceSlug] = useState('');
+    const [channelName, setChannelName] = useState('');
+    const [channelTopic, setChannelTopic] = useState('');
+    const [channelType, setChannelType] = useState<'TEXT' | 'VOICE'>('TEXT');
+    const [formError, setFormError] = useState<string | null>(null);
+
+    const activeWorkspaceId = workspaceId ? Number(workspaceId) : undefined;
+    const activeWorkspace = useMemo(
+        () => workspaces.find(w => w.id === activeWorkspaceId),
+        [workspaces, activeWorkspaceId],
+    );
+
+    const refreshWorkspaces = useCallback(async () => {
+        setLoadingWorkspaces(true);
+        try {
+            const list = await fetchWorkspaces();
+            setWorkspaces(list);
+        } finally {
+            setLoadingWorkspaces(false);
+        }
+    }, []);
+
+    const refreshDms = useCallback(async () => {
+        setLoadingDms(true);
+        try {
+            const list = await fetchDmList();
+            setDms(list);
+        } finally {
+            setLoadingDms(false);
+        }
+    }, []);
+
+    const openWorkspace = useCallback(async (id: number) => {
+        setLoadingChannels(true);
+        try {
+            const list = await fetchWorkspaceChannels(id);
+            setChannels(list);
+            const first = list[0];
+            if (first) {
+                navigate(`/app/w/${id}/ch/${first.id}`);
+            }
+        } finally {
+            setLoadingChannels(false);
+        }
+    }, [navigate]);
+
+    const handleCreateWorkspace = async () => {
+        setFormError(null);
+        const name = workspaceName.trim();
+        const slug = slugify(workspaceSlug || workspaceName);
+        if (name.length < 2 || slug.length < 3) {
+            setFormError('Name or slug is too short.');
+            return;
+        }
+        try {
+            const created = await createWorkspace({ name, slug });
+            setWorkspaces(prev => [created, ...prev]);
+            setWorkspaceModalOpen(false);
+            setWorkspaceName('');
+            setWorkspaceSlug('');
+            await openWorkspace(created.id);
+        } catch (e: any) {
+            setFormError(e?.message || 'Failed to create workspace.');
+        }
+    };
+
+    const handleCreateChannel = async () => {
+        setFormError(null);
+        const workspaceId = activeWorkspaceId ?? workspaces[0]?.id;
+        if (!workspaceId) {
+            setFormError('Create a workspace first.');
+            return;
+        }
+        const name = channelName.trim();
+        if (name.length < 2) {
+            setFormError('Channel name is too short.');
+            return;
+        }
+        try {
+            const created = await createWorkspaceChannel(workspaceId, {
+                type: channelType,
+                name,
+                topic: channelTopic.trim() || undefined,
+            });
+            setChannels(prev => [...prev, created].sort((a, b) => a.position - b.position));
+            setChannelModalOpen(false);
+            setChannelName('');
+            setChannelTopic('');
+            navigate(`/app/w/${workspaceId}/ch/${created.id}`);
+        } catch (e: any) {
+            setFormError(e?.message || 'Failed to create channel.');
+        }
+    };
+
+    useEffect(() => {
+        refreshWorkspaces();
+        refreshDms();
+    }, []);
+
+    useEffect(() => {
+        if (!activeWorkspaceId) return;
+        let cancelled = false;
+        setLoadingChannels(true);
+        fetchWorkspaceChannels(activeWorkspaceId)
+            .then(list => {
+                if (cancelled) return;
+                setChannels(list);
+                if (channelId) return;
+                if (list[0]) {
+                    navigate(`/app/w/${activeWorkspaceId}/ch/${list[0].id}`, { replace: true });
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingChannels(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [activeWorkspaceId, channelId, navigate]);
+
+    const value = useMemo(
+        () => ({
+            workspaces,
+            channels,
+            dms,
+            activeWorkspace,
+            loadingWorkspaces,
+            loadingChannels,
+            loadingDms,
+            refreshWorkspaces,
+            refreshDms,
+            openWorkspace,
+        }),
+        [
+            workspaces,
+            channels,
+            dms,
+            activeWorkspace,
+            loadingWorkspaces,
+            loadingChannels,
+            loadingDms,
+        ],
+    );
+
+    return (
+        <AppShellContext.Provider value={value}>
+            <div className="app-shell">
+                <aside className="rail workspace-rail">
+                    <div className="rail-brand">C</div>
+                    <button
+                        className="workspace-add"
+                        type="button"
+                        onClick={() => {
+                            setFormError(null);
+                            setWorkspaceModalOpen(true);
+                        }}
+                        aria-label="Add workspace"
+                    >
+                        +
+                    </button>
+                    <div className="rail-group">
+                        {loadingWorkspaces ? (
+                            <div className="rail-loading">Loading</div>
+                        ) : workspaces.length === 0 ? (
+                            <div className="rail-empty">+</div>
+                        ) : (
+                            workspaces.map(workspace => {
+                                const isActive = workspace.id === activeWorkspaceId;
+                                return (
+                                    <button
+                                        key={workspace.id}
+                                        type="button"
+                                        className={`workspace-pill${isActive ? ' active' : ''}`}
+                                        onClick={() => openWorkspace(workspace.id)}
+                                        aria-label={workspace.name}
+                                    >
+                                        {workspace.name.slice(0, 2).toUpperCase()}
+                                    </button>
+                                );
+                            })
+                        )}
+                    </div>
+                </aside>
+
+                <aside className="rail channel-rail">
+                    <div className="rail-header">
+                        <div>
+                            <div className="rail-title">
+                                {activeWorkspace?.name || 'Workspaces'}
+                            </div>
+                            <div className="rail-subtitle">channels & direct</div>
+                        </div>
+                        <button
+                            className="ghost-btn"
+                            type="button"
+                            aria-label="Add channel"
+                            onClick={() => {
+                                setFormError(null);
+                                setChannelModalOpen(true);
+                            }}
+                        >
+                            +
+                        </button>
+                    </div>
+
+                    <div className="rail-section">
+                        <div className="rail-section-title">Channels</div>
+                        {loadingChannels ? (
+                            <div className="rail-loading">Loading</div>
+                        ) : channels.length === 0 ? (
+                            <div className="rail-empty">No channels yet</div>
+                        ) : (
+                            <div className="channel-list">
+                                {channels.map(channel => {
+                                    const workspaceTarget = channel.workspaceId ?? activeWorkspaceId;
+                                    if (!workspaceTarget) return null;
+                                    return (
+                                    <NavLink
+                                        key={channel.id}
+                                        to={`/app/w/${workspaceTarget}/ch/${channel.id}`}
+                                        className={({ isActive }) =>
+                                            `channel-item${isActive ? ' active' : ''}`
+                                        }
+                                    >
+                                        <span className={`channel-icon ${channel.type.toLowerCase()}`}>
+                                            {channel.type === 'VOICE' ? '◎' : '#'}
+                                        </span>
+                                        <span className="channel-name">{channel.name || 'untitled'}</span>
+                                    </NavLink>
+                                );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="rail-section">
+                        <div className="rail-section-title">Direct</div>
+                        {loadingDms ? (
+                            <div className="rail-loading">Loading</div>
+                        ) : dms.length === 0 ? (
+                            <div className="rail-empty">No DMs yet</div>
+                        ) : (
+                            <div className="dm-list">
+                                {dms.map(dm => (
+                                    <NavLink
+                                        key={dm.channelId}
+                                        to={`/app/dm/${dm.peerUserId}`}
+                                        className={({ isActive }) =>
+                                            `dm-item${isActive ? ' active' : ''}`
+                                        }
+                                    >
+                                        <span className="dm-avatar">
+                                            {dm.peerUsername.slice(0, 2).toUpperCase()}
+                                        </span>
+                                        <span className="dm-name">{dm.peerUsername}</span>
+                                        {peerId && Number(peerId) === dm.peerUserId && (
+                                            <span className="dm-active-dot" />
+                                        )}
+                                    </NavLink>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </aside>
+
+                <main className="app-main">
+                    <Outlet />
+                </main>
+
+                <aside className="rail info-rail">
+                    <div className="info-card">
+                        <div className="info-title">Today</div>
+                        <div className="info-value">3 live rooms</div>
+                        <div className="info-sub">Stay in sync with the team.</div>
+                    </div>
+                    <div className="info-card muted">
+                        <div className="info-title">Shortcuts</div>
+                        <div className="info-sub">Shift + K to quick jump</div>
+                        <div className="info-sub">Cmd + / for command palette</div>
+                    </div>
+                </aside>
+            </div>
+            {workspaceModalOpen && (
+                <div className="modal-backdrop" role="dialog" aria-modal="true">
+                    <div className="modal">
+                        <div className="modal-title">New workspace</div>
+                        <label className="modal-field">
+                            <span>Name</span>
+                            <input
+                                value={workspaceName}
+                                onChange={e => {
+                                    setWorkspaceName(e.target.value);
+                                    setFormError(null);
+                                }}
+                                placeholder="Acme Team"
+                            />
+                        </label>
+                        <label className="modal-field">
+                            <span>Slug</span>
+                            <input
+                                value={workspaceSlug}
+                                onChange={e => {
+                                    setWorkspaceSlug(e.target.value);
+                                    setFormError(null);
+                                }}
+                                placeholder="acme-team"
+                            />
+                        </label>
+                        {formError && <div className="alert-banner">{formError}</div>}
+                        <div className="modal-actions">
+                            <button className="ghost-btn" type="button" onClick={() => setWorkspaceModalOpen(false)}>
+                                Cancel
+                            </button>
+                            <button className="primary-btn" type="button" onClick={handleCreateWorkspace}>
+                                Create
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {channelModalOpen && (
+                <div className="modal-backdrop" role="dialog" aria-modal="true">
+                    <div className="modal">
+                        <div className="modal-title">New channel</div>
+                        <label className="modal-field">
+                            <span>Type</span>
+                            <select
+                                value={channelType}
+                                onChange={e => setChannelType(e.target.value as 'TEXT' | 'VOICE')}
+                            >
+                                <option value="TEXT">Text</option>
+                                <option value="VOICE">Voice</option>
+                            </select>
+                        </label>
+                        <label className="modal-field">
+                            <span>Name</span>
+                            <input
+                                value={channelName}
+                                onChange={e => {
+                                    setChannelName(e.target.value);
+                                    setFormError(null);
+                                }}
+                                placeholder="general"
+                            />
+                        </label>
+                        <label className="modal-field">
+                            <span>Topic</span>
+                            <input
+                                value={channelTopic}
+                                onChange={e => setChannelTopic(e.target.value)}
+                                placeholder="Main updates and chatter"
+                            />
+                        </label>
+                        {formError && <div className="alert-banner">{formError}</div>}
+                        <div className="modal-actions">
+                            <button className="ghost-btn" type="button" onClick={() => setChannelModalOpen(false)}>
+                                Cancel
+                            </button>
+                            <button className="primary-btn" type="button" onClick={handleCreateChannel}>
+                                Create
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </AppShellContext.Provider>
+    );
+}

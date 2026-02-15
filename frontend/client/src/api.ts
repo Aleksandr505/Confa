@@ -24,6 +24,117 @@ export async function fetchLivekitToken(room?: string, displayName?: string) {
     return data.token;
 }
 
+export type WorkspaceDto = {
+    id: number;
+    name: string;
+    slug: string;
+    ownerUserId: number;
+    createdAt: string;
+};
+
+export type ChannelType = 'TEXT' | 'VOICE' | 'DM';
+
+export type ChannelDto = {
+    id: number;
+    workspaceId: number | null;
+    type: ChannelType;
+    name: string | null;
+    topic: string | null;
+    isPrivate: boolean;
+    position: number;
+    createdByUserId: number;
+    createdAt: string;
+};
+
+export type MessageDto = {
+    id: number;
+    channelId: number;
+    senderUserId: number | null;
+    kind: 'USER' | 'SYSTEM' | 'BOT';
+    body: string;
+    createdAt: string;
+    editedAt?: string | null;
+    deletedAt?: string | null;
+};
+
+export type MessagePageDto = {
+    items: MessageDto[];
+    nextCursor?: number | null;
+};
+
+export type DmSummary = {
+    channelId: number;
+    peerUserId: number;
+    peerUsername: string;
+};
+
+export async function fetchWorkspaces(): Promise<WorkspaceDto[]> {
+    return http<WorkspaceDto[]>('/api/workspaces', { method: 'GET' });
+}
+
+export async function createWorkspace(payload: { name: string; slug: string }): Promise<WorkspaceDto> {
+    return http<WorkspaceDto>('/api/workspaces', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function fetchWorkspaceChannels(workspaceId: number): Promise<ChannelDto[]> {
+    return http<ChannelDto[]>(`/api/workspaces/${workspaceId}/channels`, { method: 'GET' });
+}
+
+export async function createWorkspaceChannel(
+    workspaceId: number,
+    payload: { type: ChannelType; name: string; topic?: string; isPrivate?: boolean; position?: number },
+): Promise<ChannelDto> {
+    return http<ChannelDto>(`/api/workspaces/${workspaceId}/channels`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function fetchChannelMessages(
+    channelId: number,
+    cursor?: number,
+    limit?: number,
+): Promise<MessagePageDto> {
+    const params = new URLSearchParams();
+    if (cursor) params.set('cursor', String(cursor));
+    if (limit) params.set('limit', String(limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return http<MessagePageDto>(`/api/channels/${channelId}/messages${suffix}`, { method: 'GET' });
+}
+
+export async function createChannelMessage(channelId: number, body: string): Promise<MessageDto> {
+    return http<MessageDto>(`/api/channels/${channelId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+    });
+}
+
+export async function fetchDmList(): Promise<DmSummary[]> {
+    return http<DmSummary[]>('/api/dms', { method: 'GET' });
+}
+
+export async function fetchDmMessages(
+    peerId: number,
+    cursor?: number,
+    limit?: number,
+): Promise<MessagePageDto> {
+    const params = new URLSearchParams();
+    if (cursor) params.set('cursor', String(cursor));
+    if (limit) params.set('limit', String(limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return http<MessagePageDto>(`/api/dm/${peerId}/messages${suffix}`, { method: 'GET' });
+}
+
+export async function createDmMessage(peerId: number, body: string): Promise<MessageDto> {
+    return http<MessageDto>(`/api/dm/${peerId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+    });
+}
+
 export type RoomAccess = {
     id: number;
     name: string;

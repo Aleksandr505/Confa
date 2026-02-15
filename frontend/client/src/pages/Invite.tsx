@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { acceptInvite, type RoomAccess } from '../api';
-import '../styles/login.css';
 
 export default function InvitePage() {
     const { token } = useParams();
@@ -61,7 +60,7 @@ export default function InvitePage() {
                     <>
                         <p className="auth-subtitle">Приглашение не сработало</p>
                         <div className="alert alert-error">{error}</div>
-                        <button className="btn primary" type="button" onClick={() => navigate('/', { replace: true })}>
+                        <button className="btn primary" type="button" onClick={() => navigate('/app', { replace: true })}>
                             На главную
                         </button>
                     </>

@@ -1,7 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { login } from '../api';
-import '../styles/login.css';
 
 export default function LoginPage() {
     const [username, setU] = useState('');
@@ -18,7 +17,7 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await login(username, password);
-            const target = inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : '/';
+            const target = inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : '/app';
             nav(target, { replace: true });
         } catch (e: any) {
             setErr(e?.message || 'Login failed');
