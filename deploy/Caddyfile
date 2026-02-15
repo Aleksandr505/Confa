@@ -48,3 +48,8 @@ example.com {
 live.example.com {
         reverse_proxy livekit:7880
 }
+
+pass.example.com {
+    encode gzip
+    reverse_proxy ots:3000
+}
