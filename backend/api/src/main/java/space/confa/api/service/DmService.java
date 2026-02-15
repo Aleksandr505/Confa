@@ -29,19 +29,31 @@ public class DmService {
 
     public Flux<DmSummaryDto> getDmList(Long userId) {
         return databaseClient.sql("""
-                        SELECT c.id as channel_id, u.id as peer_user_id, u.username as peer_username
+                        SELECT c.id as channel_id,
+                               u.id as peer_user_id,
+                               u.username as peer_username,
+                               m.body as last_message_body,
+                               m.created_at as last_message_at
                         FROM channel c
                         JOIN channel_member cm_self ON cm_self.channel_id = c.id AND cm_self.user_id = :userId
                         JOIN channel_member cm_peer ON cm_peer.channel_id = c.id AND cm_peer.user_id <> :userId
                         JOIN user u ON u.id = cm_peer.user_id
+                        LEFT JOIN message m ON m.id = (
+                            SELECT id FROM message
+                            WHERE channel_id = c.id
+                            ORDER BY id DESC
+                            LIMIT 1
+                        )
                         WHERE c.type = 'DM'
-                        ORDER BY c.created_at DESC
+                        ORDER BY COALESCE(m.created_at, c.created_at) DESC
                         """)
                 .bind("userId", userId)
                 .map((row, metadata) -> new DmSummaryDto(
                         row.get("channel_id", Long.class),
                         row.get("peer_user_id", Long.class),
-                        row.get("peer_username", String.class)
+                        row.get("peer_username", String.class),
+                        row.get("last_message_body", String.class),
+                        row.get("last_message_at", java.time.Instant.class)
                 ))
                 .all();
     }

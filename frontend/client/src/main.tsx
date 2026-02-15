@@ -8,6 +8,7 @@ import AppShellLayout from './pages/AppShell';
 import AppHomePage from './pages/AppHome';
 import ChannelViewPage from './pages/ChannelView';
 import DmViewPage from './pages/DmView';
+import DmHomePage from './pages/DmHome';
 import './styles/app-shell.css';
 
 loadTokensFromSession();
@@ -26,7 +27,9 @@ const router = createBrowserRouter([
         element: <AppShellLayout />,
         children: [
             { index: true, element: <AppHomePage /> },
+            { path: 'w/:workspaceId', element: <AppHomePage /> },
             { path: 'w/:workspaceId/ch/:channelId', element: <ChannelViewPage /> },
+            { path: 'dm', element: <DmHomePage /> },
             { path: 'dm/:peerId', element: <DmViewPage /> },
         ],
     },

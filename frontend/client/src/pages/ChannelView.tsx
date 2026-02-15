@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAppShell } from './AppShell';
 import {
     type MessageDto,
+    createDmChannel,
     createChannelMessage,
     fetchChannelMessages,
 } from '../api';
@@ -18,6 +19,7 @@ export default function ChannelViewPage() {
     const [showScrollDown, setShowScrollDown] = useState(false);
     const listRef = useRef<HTMLDivElement | null>(null);
     const autoScrollRef = useRef(true);
+    const navigate = useNavigate();
 
     const currentChannelId = channelId ? Number(channelId) : undefined;
     const channel = useMemo(
@@ -76,6 +78,16 @@ export default function ChannelViewPage() {
         }
     }
 
+    async function openDm(userId: number | null) {
+        if (!userId) return;
+        try {
+            await createDmChannel(userId);
+            navigate(`/app/dm/${userId}`);
+        } catch (e) {
+            console.warn('Failed to open DM', e);
+        }
+    }
+
 
     return (
         <section className="channel-view">
@@ -86,12 +98,6 @@ export default function ChannelViewPage() {
                         {channel?.name || 'Channel'}
                     </div>
                     <div className="channel-subtitle">{channel?.topic || 'No topic set'}</div>
-                </div>
-                <div className="channel-actions">
-                    <button className="ghost-btn" type="button">Invite</button>
-                    <button className="primary-btn" type="button">
-                        {isVoice ? 'Join room' : 'Start thread'}
-                    </button>
                 </div>
             </header>
 
@@ -114,9 +120,14 @@ export default function ChannelViewPage() {
                             <div className="message-list" ref={listRef} onScroll={handleScroll}>
                                 {messages.map(msg => (
                                     <div key={msg.id} className="message-row">
-                                        <div className="message-avatar">
+                                        <button
+                                            className="message-avatar"
+                                            type="button"
+                                            onClick={() => openDm(msg.senderUserId ?? null)}
+                                            title="Open DM"
+                                        >
                                             {String(msg.senderUserId ?? 'S').slice(0, 2)}
-                                        </div>
+                                        </button>
                                         <div className="message-body">
                                             <div className="message-meta">
                                                 <span className="message-author">User {msg.senderUserId ?? 'System'}</span>

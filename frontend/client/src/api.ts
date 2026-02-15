@@ -73,6 +73,8 @@ export type DmSummary = {
     channelId: number;
     peerUserId: number;
     peerUsername: string;
+    lastMessageBody?: string | null;
+    lastMessageAt?: string | null;
 };
 
 export async function fetchWorkspaces(): Promise<WorkspaceDto[]> {
@@ -97,6 +99,39 @@ export async function createWorkspaceChannel(
     return http<ChannelDto>(`/api/workspaces/${workspaceId}/channels`, {
         method: 'POST',
         body: JSON.stringify(payload),
+    });
+}
+
+export type WorkspaceInvite = {
+    token: string;
+    inviteUrl?: string | null;
+    workspaceId: number;
+    workspaceName: string;
+    expiresAt?: string | null;
+    maxUses?: number | null;
+    usedCount?: number | null;
+};
+
+export async function createWorkspaceInvite(
+    workspaceId: number,
+    payload?: { ttlSeconds?: number; maxUses?: number },
+): Promise<WorkspaceInvite> {
+    return http<WorkspaceInvite>(`/api/workspaces/${workspaceId}/invites`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+    });
+}
+
+export async function acceptWorkspaceInvite(token: string): Promise<WorkspaceDto> {
+    return http<WorkspaceDto>('/api/workspaces/invites/accept', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+    });
+}
+
+export async function createDmChannel(peerId: number): Promise<ChannelDto> {
+    return http<ChannelDto>(`/api/dm/${peerId}`, {
+        method: 'POST',
     });
 }
 

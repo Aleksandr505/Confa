@@ -97,7 +97,7 @@ button {
     color: var(--shell-ink);
 }
 
-.rail-brand {
+.rail-brand-button {
     width: 42px;
     height: 42px;
     border-radius: 14px;
@@ -108,6 +108,13 @@ button {
     font-weight: 700;
     font-size: 1.1rem;
     box-shadow: 0 10px 20px rgba(255, 107, 61, 0.35);
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.rail-brand-button.active,
+.rail-brand-button:hover {
+    border-color: rgba(255, 255, 255, 0.65);
 }
 
 .rail-group {
@@ -171,6 +178,11 @@ button {
     min-height: 0;
 }
 
+.rail-section-compact {
+    align-items: center;
+    text-align: center;
+}
+
 .rail-section-title {
     font-size: 0.8rem;
     font-weight: 600;
@@ -187,6 +199,30 @@ button {
     max-height: 40vh;
 }
 
+.dm-rail {
+    display: grid;
+    gap: 8px;
+    justify-items: center;
+}
+
+.dm-rail-pill {
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    background: #fff1e3;
+    border: 1px solid transparent;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 0.7rem;
+    color: #7a3c22;
+}
+
+.dm-rail-pill.active,
+.dm-rail-pill:hover {
+    border-color: var(--shell-accent);
+}
+
 .channel-item,
 .dm-item {
     display: flex;
@@ -196,6 +232,15 @@ button {
     border-radius: 12px;
     border: 1px solid transparent;
     transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.dm-item {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    row-gap: 2px;
+    align-items: center;
 }
 
 .channel-item.active,
@@ -222,6 +267,15 @@ button {
     font-size: 0.95rem;
 }
 
+.dm-snippet {
+    grid-column: 2 / 3;
+    font-size: 0.75rem;
+    color: var(--shell-ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .dm-avatar {
     width: 32px;
     height: 32px;
@@ -232,6 +286,7 @@ button {
     font-size: 0.7rem;
     font-weight: 700;
     color: #7a3c22;
+    grid-row: 1 / span 2;
 }
 
 .dm-active-dot {
@@ -496,6 +551,12 @@ button {
     font-weight: 700;
     font-size: 0.7rem;
     color: #7a3c22;
+    border: none;
+    cursor: pointer;
+}
+
+.message-avatar:hover {
+    outline: 2px solid rgba(255, 107, 61, 0.4);
 }
 
 .message-body {
@@ -611,6 +672,11 @@ button {
     font-weight: 700;
 }
 
+.modal-subtitle {
+    color: var(--shell-ink-soft);
+    margin-top: -6px;
+}
+
 .modal-field {
     display: grid;
     gap: 6px;
@@ -635,6 +701,48 @@ button {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+}
+
+.invite-result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px dashed rgba(26, 27, 31, 0.2);
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.invite-link {
+    font-size: 0.85rem;
+    color: var(--shell-ink-soft);
+    word-break: break-all;
+}
+
+.context-menu {
+    position: fixed;
+    z-index: 20;
+    background: #fff;
+    border: 1px solid var(--shell-border);
+    border-radius: 12px;
+    box-shadow: var(--shell-shadow);
+    padding: 6px;
+    min-width: 160px;
+}
+
+.context-menu-item {
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.context-menu-item:hover {
+    background: #fff7ee;
 }
 
 .auth-root {

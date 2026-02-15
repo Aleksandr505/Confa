@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
     type ChannelDto,
     type DmSummary,
     type WorkspaceDto,
     createWorkspace,
     createWorkspaceChannel,
+    createWorkspaceInvite,
     fetchDmList,
     fetchWorkspaceChannels,
     fetchWorkspaces,
@@ -42,7 +43,8 @@ export function useAppShell() {
 
 export default function AppShellLayout() {
     const navigate = useNavigate();
-    const { workspaceId, channelId, peerId } = useParams();
+    const { workspaceId, channelId } = useParams();
+    const location = useLocation();
 
     const [workspaces, setWorkspaces] = useState<WorkspaceDto[]>([]);
     const [channels, setChannels] = useState<ChannelDto[]>([]);
@@ -58,12 +60,24 @@ export default function AppShellLayout() {
     const [channelTopic, setChannelTopic] = useState('');
     const [channelType, setChannelType] = useState<'TEXT' | 'VOICE'>('TEXT');
     const [formError, setFormError] = useState<string | null>(null);
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        workspace: WorkspaceDto;
+    } | null>(null);
+    const [inviteModalOpen, setInviteModalOpen] = useState(false);
+    const [inviteWorkspace, setInviteWorkspace] = useState<WorkspaceDto | null>(null);
+    const [inviteTtl, setInviteTtl] = useState('');
+    const [inviteMaxUses, setInviteMaxUses] = useState('');
+    const [inviteLink, setInviteLink] = useState<string | null>(null);
+    const [inviteBusy, setInviteBusy] = useState(false);
 
     const activeWorkspaceId = workspaceId ? Number(workspaceId) : undefined;
     const activeWorkspace = useMemo(
         () => workspaces.find(w => w.id === activeWorkspaceId),
         [workspaces, activeWorkspaceId],
     );
+    const isDmMode = location.pathname.startsWith('/app/dm');
 
     const refreshWorkspaces = useCallback(async () => {
         setLoadingWorkspaces(true);
@@ -93,6 +107,8 @@ export default function AppShellLayout() {
             const first = list[0];
             if (first) {
                 navigate(`/app/w/${id}/ch/${first.id}`);
+            } else {
+                navigate(`/app/w/${id}`, { replace: true });
             }
         } finally {
             setLoadingChannels(false);
@@ -144,6 +160,34 @@ export default function AppShellLayout() {
             navigate(`/app/w/${workspaceId}/ch/${created.id}`);
         } catch (e: any) {
             setFormError(e?.message || 'Failed to create channel.');
+        }
+    };
+
+    const handleCreateInvite = async () => {
+        if (!inviteWorkspace) return;
+        setFormError(null);
+        setInviteBusy(true);
+        try {
+            const ttlSeconds = inviteTtl ? Number(inviteTtl) : undefined;
+            const maxUses = inviteMaxUses ? Number(inviteMaxUses) : undefined;
+            const invite = await createWorkspaceInvite(inviteWorkspace.id, {
+                ttlSeconds: ttlSeconds && ttlSeconds > 0 ? ttlSeconds : undefined,
+                maxUses: maxUses && maxUses > 0 ? maxUses : undefined,
+            });
+            setInviteLink(invite.inviteUrl || invite.token);
+        } catch (e: any) {
+            setFormError(e?.message || 'Failed to create invite.');
+        } finally {
+            setInviteBusy(false);
+        }
+    };
+
+    const handleCopyInvite = async () => {
+        if (!inviteLink) return;
+        try {
+            await navigator.clipboard.writeText(inviteLink);
+        } catch (e) {
+            console.warn('Failed to copy invite', e);
         }
     };
 
@@ -199,9 +243,16 @@ export default function AppShellLayout() {
 
     return (
         <AppShellContext.Provider value={value}>
-            <div className="app-shell">
+            <div className="app-shell" onClick={() => setContextMenu(null)}>
                 <aside className="rail workspace-rail">
-                    <div className="rail-brand">C</div>
+                    <button
+                        className={`rail-brand-button${isDmMode ? ' active' : ''}`}
+                        type="button"
+                        onClick={() => navigate('/app/dm')}
+                        aria-label="Direct messages"
+                    >
+                        C
+                    </button>
                     <button
                         className="workspace-add"
                         type="button"
@@ -227,6 +278,14 @@ export default function AppShellLayout() {
                                         type="button"
                                         className={`workspace-pill${isActive ? ' active' : ''}`}
                                         onClick={() => openWorkspace(workspace.id)}
+                                        onContextMenu={event => {
+                                            event.preventDefault();
+                                            setContextMenu({
+                                                x: event.clientX,
+                                                y: event.clientY,
+                                                workspace,
+                                            });
+                                        }}
                                         aria-label={workspace.name}
                                     >
                                         {workspace.name.slice(0, 2).toUpperCase()}
@@ -241,81 +300,87 @@ export default function AppShellLayout() {
                     <div className="rail-header">
                         <div>
                             <div className="rail-title">
-                                {activeWorkspace?.name || 'Workspaces'}
+                                {isDmMode ? 'Direct messages' : activeWorkspace?.name || 'Workspaces'}
                             </div>
-                            <div className="rail-subtitle">channels & direct</div>
+                            <div className="rail-subtitle">
+                                {isDmMode ? 'conversations' : 'channels'}
+                            </div>
                         </div>
-                        <button
-                            className="ghost-btn"
-                            type="button"
-                            aria-label="Add channel"
-                            onClick={() => {
-                                setFormError(null);
-                                setChannelModalOpen(true);
-                            }}
-                        >
-                            +
-                        </button>
-                    </div>
-
-                    <div className="rail-section">
-                        <div className="rail-section-title">Channels</div>
-                        {loadingChannels ? (
-                            <div className="rail-loading">Loading</div>
-                        ) : channels.length === 0 ? (
-                            <div className="rail-empty">No channels yet</div>
-                        ) : (
-                            <div className="channel-list">
-                                {channels.map(channel => {
-                                    const workspaceTarget = channel.workspaceId ?? activeWorkspaceId;
-                                    if (!workspaceTarget) return null;
-                                    return (
-                                    <NavLink
-                                        key={channel.id}
-                                        to={`/app/w/${workspaceTarget}/ch/${channel.id}`}
-                                        className={({ isActive }) =>
-                                            `channel-item${isActive ? ' active' : ''}`
-                                        }
-                                    >
-                                        <span className={`channel-icon ${channel.type.toLowerCase()}`}>
-                                            {channel.type === 'VOICE' ? '◎' : '#'}
-                                        </span>
-                                        <span className="channel-name">{channel.name || 'untitled'}</span>
-                                    </NavLink>
-                                );
-                                })}
-                            </div>
+                        {!isDmMode && (
+                            <button
+                                className="ghost-btn"
+                                type="button"
+                                aria-label="Add channel"
+                                onClick={() => {
+                                    setFormError(null);
+                                    setChannelModalOpen(true);
+                                }}
+                            >
+                                +
+                            </button>
                         )}
                     </div>
 
-                    <div className="rail-section">
-                        <div className="rail-section-title">Direct</div>
-                        {loadingDms ? (
-                            <div className="rail-loading">Loading</div>
-                        ) : dms.length === 0 ? (
-                            <div className="rail-empty">No DMs yet</div>
-                        ) : (
-                            <div className="dm-list">
-                                {dms.map(dm => (
-                                    <NavLink
-                                        key={dm.channelId}
-                                        to={`/app/dm/${dm.peerUserId}`}
-                                        className={({ isActive }) =>
-                                            `dm-item${isActive ? ' active' : ''}`
-                                        }
-                                    >
-                                        <span className="dm-avatar">
-                                            {dm.peerUsername.slice(0, 2).toUpperCase()}
-                                        </span>
-                                        <span className="dm-name">{dm.peerUsername}</span>
-                                        {peerId && Number(peerId) === dm.peerUserId && (
-                                            <span className="dm-active-dot" />
-                                        )}
-                                    </NavLink>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    {isDmMode ? (
+                        <div className="rail-section">
+                            <div className="rail-section-title">Direct</div>
+                            {loadingDms ? (
+                                <div className="rail-loading">Loading</div>
+                            ) : dms.length === 0 ? (
+                                <div className="rail-empty">No DMs yet</div>
+                            ) : (
+                                <div className="dm-list">
+                                    {dms.map(dm => (
+                                        <NavLink
+                                            key={dm.channelId}
+                                            to={`/app/dm/${dm.peerUserId}`}
+                                            className={({ isActive }) =>
+                                                `dm-item${isActive ? ' active' : ''}`
+                                            }
+                                        >
+                                            <span className="dm-avatar">
+                                                {dm.peerUsername.slice(0, 2).toUpperCase()}
+                                            </span>
+                                            <span className="dm-name">{dm.peerUsername}</span>
+                                            <span className="dm-snippet">
+                                                {dm.lastMessageBody || 'No messages yet'}
+                                            </span>
+                                        </NavLink>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="rail-section">
+                            <div className="rail-section-title">Channels</div>
+                            {loadingChannels ? (
+                                <div className="rail-loading">Loading</div>
+                            ) : channels.length === 0 ? (
+                                <div className="rail-empty">No channels yet</div>
+                            ) : (
+                                <div className="channel-list">
+                                    {channels.map(channel => {
+                                        const workspaceTarget = channel.workspaceId ?? activeWorkspaceId;
+                                        if (!workspaceTarget) return null;
+                                        return (
+                                        <NavLink
+                                            key={channel.id}
+                                            to={`/app/w/${workspaceTarget}/ch/${channel.id}`}
+                                            className={({ isActive }) =>
+                                                `channel-item${isActive ? ' active' : ''}`
+                                            }
+                                        >
+                                            <span className={`channel-icon ${channel.type.toLowerCase()}`}>
+                                                {channel.type === 'VOICE' ? '◎' : '#'}
+                                            </span>
+                                            <span className="channel-name">{channel.name || 'untitled'}</span>
+                                        </NavLink>
+                                    );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </aside>
 
                 <main className="app-main">
@@ -416,6 +481,83 @@ export default function AppShellLayout() {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+            {inviteModalOpen && inviteWorkspace && (
+                <div className="modal-backdrop" role="dialog" aria-modal="true">
+                    <div className="modal">
+                        <div className="modal-title">Workspace invite</div>
+                        <div className="modal-subtitle">{inviteWorkspace.name}</div>
+                        <label className="modal-field">
+                            <span>TTL (seconds)</span>
+                            <input
+                                value={inviteTtl}
+                                onChange={e => setInviteTtl(e.target.value)}
+                                placeholder="604800"
+                            />
+                        </label>
+                        <label className="modal-field">
+                            <span>Max uses</span>
+                            <input
+                                value={inviteMaxUses}
+                                onChange={e => setInviteMaxUses(e.target.value)}
+                                placeholder="10"
+                            />
+                        </label>
+                        {inviteLink && (
+                            <div className="invite-result">
+                                <div className="invite-link">{inviteLink}</div>
+                                <button className="ghost-btn" type="button" onClick={handleCopyInvite}>
+                                    Copy
+                                </button>
+                            </div>
+                        )}
+                        {formError && <div className="alert-banner">{formError}</div>}
+                        <div className="modal-actions">
+                            <button
+                                className="ghost-btn"
+                                type="button"
+                                onClick={() => {
+                                    setInviteModalOpen(false);
+                                    setInviteWorkspace(null);
+                                    setInviteLink(null);
+                                }}
+                            >
+                                Close
+                            </button>
+                            <button
+                                className="primary-btn"
+                                type="button"
+                                onClick={handleCreateInvite}
+                                disabled={inviteBusy}
+                            >
+                                {inviteBusy ? 'Creating…' : 'Create invite'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {contextMenu && (
+                <div
+                    className="context-menu"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                    onClick={event => event.stopPropagation()}
+                    onMouseLeave={() => setContextMenu(null)}
+                >
+                    <button
+                        type="button"
+                        className="context-menu-item"
+                        onClick={() => {
+                            setInviteWorkspace(contextMenu.workspace);
+                            setInviteLink(null);
+                            setInviteTtl('');
+                            setInviteMaxUses('');
+                            setInviteModalOpen(true);
+                            setContextMenu(null);
+                        }}
+                    >
+                        Create invite
+                    </button>
                 </div>
             )}
         </AppShellContext.Provider>

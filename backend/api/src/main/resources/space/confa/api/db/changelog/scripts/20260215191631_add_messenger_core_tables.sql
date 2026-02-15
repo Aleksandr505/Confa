@@ -27,6 +27,22 @@ create table workspace_member
 
 create index idx_workspace_member_user on workspace_member (user_id);
 
+create table workspace_invite
+(
+    id          bigint auto_increment primary key,
+    workspace_id bigint       not null,
+    token_hash  char(64)     not null,
+    expires_at  timestamp    null,
+    max_uses    int          default 1 not null,
+    used_count  int          default 0 not null,
+    created_by  bigint       not null,
+    created_at  timestamp    default CURRENT_TIMESTAMP null,
+    updated_at  timestamp    default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    constraint unique_workspace_invite_token unique (token_hash),
+    constraint fk_workspace_invite_workspace foreign key (workspace_id) references workspace (id),
+    constraint fk_workspace_invite_creator foreign key (created_by) references user (id)
+) engine = InnoDB;
+
 create table channel
 (
     id                 bigint auto_increment primary key,
