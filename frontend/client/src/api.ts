@@ -24,6 +24,13 @@ export async function fetchLivekitToken(room?: string, displayName?: string) {
     return data.token;
 }
 
+export async function fetchChannelLivekitToken(channelId: number): Promise<string> {
+    const data = await http<{ token: string }>(`/api/channels/${channelId}/livekit-token`, {
+        method: 'POST',
+    });
+    return data.token;
+}
+
 export type WorkspaceDto = {
     id: number;
     name: string;

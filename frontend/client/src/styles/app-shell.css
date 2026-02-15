@@ -361,6 +361,104 @@ button {
     color: var(--shell-ink-soft);
 }
 
+.voice-embed {
+    border-radius: var(--shell-radius);
+    border: 1px solid rgba(17, 24, 39, 0.4);
+    box-shadow: var(--shell-shadow);
+    overflow: hidden;
+    background: #0b0f19;
+}
+
+.voice-stage {
+    display: grid;
+    gap: 16px;
+    border-radius: var(--shell-radius);
+    border: 1px solid rgba(17, 24, 39, 0.16);
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.voice-stage-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.voice-stage-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.voice-stage-subtitle {
+    color: var(--shell-ink-soft);
+    font-size: 0.85rem;
+}
+
+.voice-stage-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.voice-stage-body {
+    min-height: 320px;
+}
+
+.voice-room {
+    width: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #0b0f19;
+    border: 1px solid rgba(17, 24, 39, 0.5);
+}
+
+.voice-grid {
+    height: 420px;
+    background: #0b0f19;
+}
+
+.voice-toolbar {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(17, 24, 39, 0.85);
+}
+
+.voice-stage-empty {
+    display: grid;
+    place-items: center;
+    padding: 60px 20px;
+    border-radius: 16px;
+    border: 1px dashed rgba(17, 24, 39, 0.2);
+    background: rgba(255, 255, 255, 0.6);
+    text-align: center;
+}
+
+.voice-stage-empty-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.voice-stage-empty-subtitle {
+    margin-top: 6px;
+    color: var(--shell-ink-soft);
+}
+
+.toggle-pill {
+    border: 1px solid var(--shell-border);
+    border-radius: 999px;
+    padding: 8px 12px;
+    background: #fff;
+    color: var(--shell-ink-soft);
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.toggle-pill.active {
+    border-color: rgba(44, 141, 131, 0.4);
+    color: var(--shell-ink);
+    background: rgba(44, 141, 131, 0.12);
+}
+
 .message-panel {
     background: rgba(255, 255, 255, 0.9);
     border-radius: var(--shell-radius);
@@ -672,5 +770,9 @@ button {
     .composer,
     .voice-hero {
         padding: 14px;
+    }
+
+    .voice-grid {
+        height: 320px;
     }
 }

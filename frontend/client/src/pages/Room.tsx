@@ -39,6 +39,7 @@ import {
 } from '@livekit/components-core';
 import {
     fetchLivekitToken,
+    fetchChannelLivekitToken,
     fetchRoomAgents,
     inviteAgent,
     kickAgent,
@@ -76,9 +77,25 @@ type PermIssue = {
     message?: string;
 };
 
-export default function RoomPage() {
-    const { roomId = 'demo' } = useParams();
+type RoomPageProps = {
+    roomName?: string;
+    channelId?: number;
+    embedded?: boolean;
+    hideChat?: boolean;
+    onExit?: () => void;
+};
+
+export default function RoomPage({ roomName, channelId, embedded, hideChat, onExit }: RoomPageProps = {}) {
+    const { roomId } = useParams();
+    const resolvedRoomId = roomName ?? roomId ?? 'demo';
     const navigate = useNavigate();
+    const handleExit = () => {
+        if (onExit) {
+            onExit();
+            return;
+        }
+        navigate('/', { replace: true });
+    };
 
     const [token, setToken] = useState<string>();
     const [ready, setReady] = useState(false);
@@ -112,9 +129,9 @@ export default function RoomPage() {
     const agentsFeatureEnabled = roomConfig?.isAgentsEnabled === true;
 
     useEffect(() => {
-        if (!roomId) return;
-        const volumeKey = `confa:volumes:${roomId}`;
-        const screenShareKey = `confa:screenShareVolumes:${roomId}`;
+        if (!resolvedRoomId) return;
+        const volumeKey = `confa:volumes:${resolvedRoomId}`;
+        const screenShareKey = `confa:screenShareVolumes:${resolvedRoomId}`;
         try {
             const raw = localStorage.getItem(volumeKey);
             if (raw) {
@@ -133,49 +150,49 @@ export default function RoomPage() {
         } catch (e) {
             console.warn('Failed to load screen share volume settings', e);
         }
-    }, [roomId]);
+    }, [resolvedRoomId]);
 
     useEffect(() => {
-        if (!roomId) return;
-        const volumeKey = `confa:volumes:${roomId}`;
+        if (!resolvedRoomId) return;
+        const volumeKey = `confa:volumes:${resolvedRoomId}`;
         try {
             localStorage.setItem(volumeKey, JSON.stringify(volumes));
         } catch (e) {
             console.warn('Failed to save volume settings', e);
         }
-    }, [roomId, volumes]);
+    }, [resolvedRoomId, volumes]);
 
     useEffect(() => {
-        if (!roomId) return;
-        const screenShareKey = `confa:screenShareVolumes:${roomId}`;
+        if (!resolvedRoomId) return;
+        const screenShareKey = `confa:screenShareVolumes:${resolvedRoomId}`;
         try {
             localStorage.setItem(screenShareKey, JSON.stringify(screenShareVolumes));
         } catch (e) {
             console.warn('Failed to save screen share volume settings', e);
         }
-    }, [roomId, screenShareVolumes]);
+    }, [resolvedRoomId, screenShareVolumes]);
 
     useEffect(() => {
-        if (!roomId) return;
+        if (!resolvedRoomId) return;
         fetchMyRooms()
-            .then(list => setRoomAccess(list.find(r => r.name === roomId) || null))
+            .then(list => setRoomAccess(list.find(r => r.name === resolvedRoomId) || null))
             .catch(() => {});
-    }, [roomId]);
+    }, [resolvedRoomId]);
 
     useEffect(() => {
-        if (!ready || !roomId) return;
+        if (!ready || !resolvedRoomId) return;
 
         setRoomConfigLoading(true);
         setRoomConfigError(null);
 
-        fetchRoomMetadata(roomId)
+        fetchRoomMetadata(resolvedRoomId)
             .then(cfg => setRoomConfig(cfg))
             .catch(e => {
                 console.warn('Failed to load room config', e);
                 setRoomConfigError(e?.message || 'Не удалось получить конфиг комнаты');
             })
             .finally(() => setRoomConfigLoading(false));
-    }, [ready, roomId]);
+    }, [ready, resolvedRoomId]);
 
     useEffect(() => {
         if (!ready) return;
@@ -185,7 +202,9 @@ export default function RoomPage() {
         (async () => {
             try {
                 const displayName = choices?.username?.trim() || undefined;
-                const t = await fetchLivekitToken(roomId, displayName);
+                const t = channelId
+                    ? await fetchChannelLivekitToken(channelId)
+                    : await fetchLivekitToken(resolvedRoomId, displayName);
                 if (!cancelled) setToken(t);
             } catch (e: any) {
                 if (!cancelled) {
@@ -200,7 +219,7 @@ export default function RoomPage() {
         return () => {
             cancelled = true;
         };
-    }, [ready, roomId, choices?.username]);
+    }, [ready, resolvedRoomId, choices?.username]);
 
     const audioProp = useMemo(() => {
         if (!choices?.audioEnabled) return false;
@@ -214,11 +233,11 @@ export default function RoomPage() {
 
     const loadAgents = useCallback(
         async (silent = false) => {
-            if (!roomId) return;
+            if (!resolvedRoomId) return;
             if (!silent) setAgentsLoading(true);
             setAgentsError(null);
             try {
-                const list = await fetchRoomAgents(roomId);
+                const list = await fetchRoomAgents(resolvedRoomId);
                 setAgents(list);
                 if (!selectedAgentId && list.length) {
                     setSelectedAgentId(list[0].identity);
@@ -234,21 +253,21 @@ export default function RoomPage() {
                 if (!silent) setAgentsLoading(false);
             }
         },
-        [roomId, selectedAgentId],
+        [resolvedRoomId, selectedAgentId],
     );
 
     useEffect(() => {
-        if (!ready || !roomId) return;
+        if (!ready || !resolvedRoomId) return;
         const id = setInterval(() => {
             loadAgents(true);
         }, 5000);
         return () => clearInterval(id);
-    }, [ready, roomId, loadAgents]);
+    }, [ready, resolvedRoomId, loadAgents]);
 
     useEffect(() => {
         if (!ready) return;
         loadAgents(true);
-    }, [ready, roomId, loadAgents]);
+    }, [ready, resolvedRoomId, loadAgents]);
 
     useEffect(() => {
         if (!inviteInfo) {
@@ -257,10 +276,10 @@ export default function RoomPage() {
     }, [inviteInfo]);
 
     async function handleEnableAgents() {
-        if (!roomId) return;
+        if (!resolvedRoomId) return;
         try {
-            await enableRoomAgents(roomId);
-            const cfg = await fetchRoomMetadata(roomId);
+            await enableRoomAgents(resolvedRoomId);
+            const cfg = await fetchRoomMetadata(resolvedRoomId);
             setRoomConfig(cfg);
         } catch (e: any) {
             alert(e?.message || 'Не удалось включить агентов');
@@ -268,13 +287,13 @@ export default function RoomPage() {
     }
 
     async function handleDisableAgents() {
-        if (!roomId) return;
+        if (!resolvedRoomId) return;
         if (!confirm('Отключить агентов в этой комнате? Все приглашения станут недоступны.')) {
             return;
         }
         try {
-            await disableRoomAgents(roomId);
-            const cfg = await fetchRoomMetadata(roomId);
+            await disableRoomAgents(resolvedRoomId);
+            const cfg = await fetchRoomMetadata(resolvedRoomId);
             setRoomConfig(cfg);
         } catch (e: any) {
             alert(e?.message || 'Не удалось отключить агентов');
@@ -282,12 +301,12 @@ export default function RoomPage() {
     }
 
     async function handleCreateInvite() {
-        if (!roomId) return;
+        if (!resolvedRoomId) return;
         setInviteBusy(true);
         setInviteError(null);
         setInviteInfo(null);
         try {
-            const invite = await createInvite(roomId, {});
+            const invite = await createInvite(resolvedRoomId, {});
             setInviteInfo(invite);
         } catch (e: any) {
             setInviteError(e?.message || 'Не удалось создать приглашение');
@@ -309,10 +328,10 @@ export default function RoomPage() {
     }
 
     async function handleInvite(role: AgentRole) {
-        if (!roomId) return;
+        if (!resolvedRoomId) return;
         setInviteLoading(true);
         try {
-            await inviteAgent(roomId, role);
+            await inviteAgent(resolvedRoomId, role);
             await loadAgents();
         } catch (e: any) {
             alert(e?.message || 'Не удалось пригласить агента');
@@ -322,10 +341,10 @@ export default function RoomPage() {
     }
 
     async function handleKick() {
-        if (!roomId || !selectedAgentId) return;
-        if (!confirm(`Выгнать агента ${selectedAgentId} из комнаты ${roomId}?`)) return;
+        if (!resolvedRoomId || !selectedAgentId) return;
+        if (!confirm(`Выгнать агента ${selectedAgentId} из комнаты ${resolvedRoomId}?`)) return;
         try {
-            await kickAgent(roomId, { agentIdentity: selectedAgentId });
+            await kickAgent(resolvedRoomId, { agentIdentity: selectedAgentId });
             await loadAgents();
         } catch (e: any) {
             alert(e?.message || 'Не удалось выгнать агента');
@@ -333,11 +352,11 @@ export default function RoomPage() {
     }
 
     async function handleToggleMute() {
-        if (!roomId || !selectedAgentId) return;
+        if (!resolvedRoomId || !selectedAgentId) return;
         const agent = agents.find(a => a.identity === selectedAgentId);
         if (!agent) return;
         try {
-            await muteAgent(roomId, agent.sid, !agent.muted);
+            await muteAgent(resolvedRoomId, agent.sid, !agent.muted);
             await loadAgents();
         } catch (e: any) {
             alert(e?.message || 'Не удалось изменить mute для агента');
@@ -345,14 +364,14 @@ export default function RoomPage() {
     }
 
     async function handleFocus() {
-        if (!roomId || !selectedAgentId) return;
+        if (!resolvedRoomId || !selectedAgentId) return;
         const userIdentity = getUserIdentity();
         if (!userIdentity) {
             alert('Не удалось определить вашу identity');
             return;
         }
         try {
-            await focusAgent(roomId, {
+            await focusAgent(resolvedRoomId, {
                 activeAgentIdentity: selectedAgentId,
                 userIdentity,
             });
@@ -364,17 +383,17 @@ export default function RoomPage() {
 
     if (!ready) {
         return (
-            <div className="lk-root gradient-bg">
+            <div className={`lk-root gradient-bg${embedded ? ' embedded' : ''}`}>
                 <div className="prejoin-shell theme-light" data-lk-theme="default">
                     <header className="lk-appbar light">
                         <div className="brand">
                             <span className="brand-dot" />
-                            <span className="brand-title">Комната: {roomId}</span>
+                            <span className="brand-title">Комната: {resolvedRoomId}</span>
                         </div>
                         <button
                             className="btn ghost small"
                             type="button"
-                            onClick={() => navigate('/')}
+                                onClick={handleExit}
                         >
                             На главную
                         </button>
@@ -413,7 +432,7 @@ export default function RoomPage() {
 
     if (ready && !token) {
         return (
-            <div className="lk-root gradient-bg">
+            <div className={`lk-root gradient-bg${embedded ? ' embedded' : ''}`}>
                 <div className="center-card">
                     {prejoinError ? (
                         <>
@@ -421,7 +440,7 @@ export default function RoomPage() {
                             <button
                                 className="btn ghost small"
                                 type="button"
-                                onClick={() => navigate('/', { replace: true })}
+                                onClick={handleExit}
                             >
                                 На главную
                             </button>
@@ -440,7 +459,7 @@ export default function RoomPage() {
     const selectedAgent = agents.find(a => a.identity === selectedAgentId);
 
     return (
-        <div className="lk-root gradient-bg">
+        <div className={`lk-root gradient-bg${embedded ? ' embedded' : ''}`}>
             <LiveKitRoom
                 data-lk-theme="default"
                 serverUrl={wsUrl}
@@ -471,13 +490,13 @@ export default function RoomPage() {
                     setReady(false);
                     setToken(undefined);
                     setVolumePanelOpen(false);
-                    navigate('/', { replace: true });
+                    handleExit();
                 }}
             >
                 <header className="lk-appbar">
                     <div className="brand">
                         <span className="brand-dot" />
-                        <span className="brand-title">Комната: {roomId}</span>
+                        <span className="brand-title">Комната: {resolvedRoomId}</span>
                     </div>
                     <div className="appbar-actions">
                         {roomAccess?.role === 'OWNER' && (
@@ -675,7 +694,7 @@ export default function RoomPage() {
                 <ParticipantJoinTone />
 
                 <main className="lk-main">
-                    <BrandedVideoConference />
+                    <BrandedVideoConference disableChat={hideChat || embedded} />
                 </main>
 
                 <StartAudio label="Включить звук в браузере" />
@@ -1057,7 +1076,7 @@ function BrandedParticipantTile(props: ParticipantTileProps) {
     );
 }
 
-function BrandedVideoConference() {
+function BrandedVideoConference({ disableChat }: { disableChat?: boolean }) {
     const [widgetState, setWidgetState] = useState<WidgetState>({
         showChat: false,
         unreadMessages: 0,
@@ -1199,7 +1218,7 @@ function BrandedVideoConference() {
                     <div className="lk-control-bar-row" data-lk-control-bar data-audio-off={isDeafened ? 'true' : 'false'}>
                         <ControlBar
                             className="lk-control-bar--main"
-                            controls={{ chat: true, screenShare: true }}
+                            controls={{ chat: !disableChat, screenShare: true }}
                             onDeviceError={({ source, error }) => {
                                 if (source === Track.Source.ScreenShare) {
                                     setScreenShareError(
@@ -1235,7 +1254,9 @@ function BrandedVideoConference() {
                         </button>
                     </div>
                 )}
-                <Chat style={{ display: widgetState.showChat ? 'grid' : 'none' }} />
+                {!disableChat && (
+                    <Chat style={{ display: widgetState.showChat ? 'grid' : 'none' }} />
+                )}
             </LayoutContextProvider>
             <RoomAudioRenderer muted={isDeafened} />
             <ConnectionStateToast />
