@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createRoom, fetchMyRoomsSummary, type RoomAccessSummary } from '../api';
 import '../styles/login.css';
+import '../styles/home.css';
 
 function normalizeRoomName(raw: string) {
     return raw
@@ -18,6 +19,10 @@ export default function HomePage() {
     const [roomName, setRoomName] = useState('my-room');
     const [creating, setCreating] = useState(false);
     const nav = useNavigate();
+
+    useEffect(() => {
+        document.body.classList.remove('app-shell-mode');
+    }, []);
 
     const loadRoomOrder = () => {
         try {
@@ -96,7 +101,16 @@ export default function HomePage() {
     }
 
     return (
-        <div className="auth-root client-theme">
+        <div className="auth-root client-theme home-root">
+            <a
+                className="switch-to-shell"
+                href="/app"
+                target="_blank"
+                rel="noreferrer"
+                title="Open Messenger"
+            >
+                ⦿
+            </a>
             <div className="auth-card">
                 <h1 className="auth-title">Confa</h1>
                 <p className="auth-subtitle">Комнаты:</p>

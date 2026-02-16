@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { login } from '../api';
 
@@ -11,13 +11,17 @@ export default function LoginPage() {
     const [searchParams] = useSearchParams();
     const inviteToken = searchParams.get('invite');
 
+    useEffect(() => {
+        document.body.classList.remove('app-shell-mode');
+    }, []);
+
     async function onSubmit(e: FormEvent) {
         e.preventDefault();
         setErr(null);
         setLoading(true);
         try {
             await login(username, password);
-            const target = inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : '/app';
+            const target = inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : '/';
             nav(target, { replace: true });
         } catch (e: any) {
             setErr(e?.message || 'Login failed');

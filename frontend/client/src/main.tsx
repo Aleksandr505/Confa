@@ -2,6 +2,8 @@ import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, redirect } from 'react-router-dom';
 import LoginPage from './pages/Login';
 import InvitePage from './pages/Invite';
+import HomePage from './pages/Home';
+import RoomPage from './pages/Room';
 import { isAuthed } from './auth';
 import { loadTokensFromSession } from './lib/auth';
 import AppShellLayout from './pages/AppShell';
@@ -9,7 +11,6 @@ import AppHomePage from './pages/AppHome';
 import ChannelViewPage from './pages/ChannelView';
 import DmViewPage from './pages/DmView';
 import DmHomePage from './pages/DmHome';
-import './styles/app-shell.css';
 
 loadTokensFromSession();
 
@@ -17,6 +18,22 @@ const router = createBrowserRouter([
     {
         path: '/login',
         element: <LoginPage />,
+    },
+    {
+        path: '/',
+        loader: async () => {
+            if (!isAuthed()) throw redirect('/login');
+            return null;
+        },
+        element: <HomePage />,
+    },
+    {
+        path: '/room/:roomId',
+        loader: async () => {
+            if (!isAuthed()) throw redirect('/login');
+            return null;
+        },
+        element: <RoomPage />,
     },
     {
         path: '/app',
@@ -45,7 +62,7 @@ const router = createBrowserRouter([
     },
     {
         path: '*',
-        loader: async () => redirect('/app'),
+        loader: async () => redirect('/'),
     },
 ]);
 

@@ -1,0 +1,25 @@
+.home-root {
+    position: relative;
+}
+
+.switch-to-shell {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    text-decoration: none;
+    color: var(--client-fg);
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.5);
+    font-size: 1rem;
+}
+
+.switch-to-shell:hover {
+    border-color: var(--client-accent);
+    color: #fff;
+}

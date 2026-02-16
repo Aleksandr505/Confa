@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
-:root {
+body.app-shell-mode {
     --shell-bg: #f6f0e7;
     --shell-panel: #ffffff;
     --shell-panel-muted: #f2ebe0;
@@ -16,13 +16,13 @@
     --shell-mono: 'Space Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
-*,
-*::before,
-*::after {
+body.app-shell-mode *,
+body.app-shell-mode *::before,
+body.app-shell-mode *::after {
     box-sizing: border-box;
 }
 
-body {
+body.app-shell-mode {
     margin: 0;
     font-family: var(--shell-font);
     color: var(--shell-ink);
@@ -31,12 +31,12 @@ body {
     overflow: hidden;
 }
 
-a {
+body.app-shell-mode a {
     color: inherit;
     text-decoration: none;
 }
 
-button {
+body.app-shell-mode button {
     font-family: inherit;
 }
 
@@ -743,83 +743,6 @@ button {
 
 .context-menu-item:hover {
     background: #fff7ee;
-}
-
-.auth-root {
-    min-height: 100dvh;
-    display: grid;
-    place-items: center;
-    padding: 20px;
-}
-
-.auth-card {
-    width: min(420px, 100%);
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 20px;
-    padding: 28px;
-    border: 1px solid var(--shell-border);
-    box-shadow: var(--shell-shadow);
-}
-
-.auth-title {
-    margin: 0 0 8px;
-    font-size: 1.6rem;
-    font-weight: 700;
-}
-
-.auth-subtitle {
-    margin: 0 0 16px;
-    color: var(--shell-ink-soft);
-}
-
-.auth-form {
-    display: grid;
-    gap: 12px;
-}
-
-.field {
-    display: grid;
-    gap: 6px;
-}
-
-.field span {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--shell-ink-soft);
-}
-
-.auth-form input {
-    padding: 10px 12px;
-    border-radius: 12px;
-    border: 1px solid var(--shell-border);
-    background: #fff;
-    font: inherit;
-}
-
-.btn {
-    border: none;
-    border-radius: 999px;
-    padding: 10px 16px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.btn.primary {
-    background: var(--shell-accent);
-    color: #fff;
-}
-
-.alert {
-    border-radius: 12px;
-    padding: 8px 10px;
-    font-size: 0.9rem;
-}
-
-.alert-error {
-    background: rgba(230, 90, 70, 0.1);
-    border: 1px solid rgba(230, 90, 70, 0.3);
-    color: #9c2e18;
 }
 
 @keyframes revealUp {

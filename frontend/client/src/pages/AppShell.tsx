@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import '../styles/app-shell.css';
 import {
     type ChannelDto,
     type DmSummary,
@@ -190,6 +191,13 @@ export default function AppShellLayout() {
             console.warn('Failed to copy invite', e);
         }
     };
+
+    useEffect(() => {
+        document.body.classList.add('app-shell-mode');
+        return () => {
+            document.body.classList.remove('app-shell-mode');
+        };
+    }, []);
 
     useEffect(() => {
         refreshWorkspaces();
