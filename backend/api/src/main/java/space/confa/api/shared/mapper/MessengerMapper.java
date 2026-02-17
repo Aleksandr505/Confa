@@ -7,6 +7,8 @@ import space.confa.api.model.entity.ChannelEntity;
 import space.confa.api.model.entity.MessageEntity;
 import space.confa.api.model.entity.WorkspaceEntity;
 
+import java.util.List;
+
 public final class MessengerMapper {
 
     private MessengerMapper() {}
@@ -40,8 +42,13 @@ public final class MessengerMapper {
                 entity.getId(),
                 entity.getChannelId(),
                 entity.getSenderUserId(),
+                null,
                 entity.getKind(),
                 entity.getBody(),
+                entity.getReplyToMessageId(),
+                null,
+                null,
+                List.of(),
                 entity.getCreatedAt(),
                 entity.getEditedAt(),
                 entity.getDeletedAt()

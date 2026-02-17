@@ -2,8 +2,7 @@ package space.confa.api.model.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record CreateMessageDto(
+public record ToggleReactionDto(
         @NotBlank
-        String body,
-        Long replyToMessageId
+        String emoji
 ) {}

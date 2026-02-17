@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAppShell } from './AppShell';
-import { type MessageDto, createDmMessage, fetchDmMessages } from '../api';
+import {
+    type MessageDto,
+    addMessageReaction,
+    createDmMessage,
+    fetchDmMessages,
+    removeMessageReaction,
+} from '../api';
+import { getUserIdentity } from '../lib/auth';
+import MessageTimeline from '../components/MessageTimeline';
 
 export default function DmViewPage() {
     const { peerId } = useParams();
@@ -10,9 +18,16 @@ export default function DmViewPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [draft, setDraft] = useState('');
+    const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
     const [showScrollDown, setShowScrollDown] = useState(false);
     const listRef = useRef<HTMLDivElement | null>(null);
     const autoScrollRef = useRef(true);
+    const myUserId = useMemo(() => {
+        const identity = getUserIdentity();
+        if (!identity) return null;
+        const parsed = Number(identity);
+        return Number.isFinite(parsed) ? parsed : null;
+    }, []);
 
     const numericPeerId = peerId ? Number(peerId) : undefined;
     const peer = useMemo(
@@ -60,10 +75,24 @@ export default function DmViewPage() {
         if (!trimmed) return;
         setDraft('');
         try {
-            const msg = await createDmMessage(numericPeerId, trimmed);
+            const msg = await createDmMessage(numericPeerId, trimmed, replyTo?.id);
             setMessages(prev => [...prev, msg]);
+            setReplyTo(null);
         } catch (e: any) {
             setError(e?.message || 'Failed to send message');
+        }
+    }
+
+    async function toggleReaction(message: MessageDto, emoji: string, reactedByMe: boolean) {
+        try {
+            const reactions = reactedByMe
+                ? await removeMessageReaction(message.id, emoji)
+                : await addMessageReaction(message.id, emoji);
+            setMessages(prev =>
+                prev.map(item => (item.id === message.id ? { ...item, reactions } : item)),
+            );
+        } catch (e) {
+            console.warn('Failed to toggle reaction', e);
         }
     }
 
@@ -88,24 +117,14 @@ export default function DmViewPage() {
                 ) : messages.length === 0 ? (
                     <div className="empty-subtitle">No messages yet. Say hello.</div>
                 ) : (
-                    <div className="message-list" ref={listRef} onScroll={handleScroll}>
-                        {messages.map(msg => (
-                            <div key={msg.id} className="message-row">
-                                <div className="message-avatar">
-                                    {String(msg.senderUserId ?? 'S').slice(0, 2)}
-                                </div>
-                                <div className="message-body">
-                                    <div className="message-meta">
-                                        <span className="message-author">User {msg.senderUserId ?? 'System'}</span>
-                                        <span className="message-time">
-                                            {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString() : ''}
-                                        </span>
-                                    </div>
-                                    <div className="message-text">{msg.body}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    <MessageTimeline
+                        messages={messages}
+                        myUserId={myUserId}
+                        listRef={listRef}
+                        onScroll={handleScroll}
+                        onReply={setReplyTo}
+                        onToggleReaction={toggleReaction}
+                    />
                 )}
                 {showScrollDown && (
                     <button className="scroll-down-btn" type="button" onClick={scrollToBottom}>
@@ -115,6 +134,19 @@ export default function DmViewPage() {
             </div>
 
             <div className="composer">
+                {replyTo && (
+                    <div className="composer-reply">
+                        <div className="composer-reply-text">
+                            <span className="composer-reply-author">
+                                Replying to {replyTo.senderUsername || `User ${replyTo.senderUserId ?? 'System'}`}
+                            </span>
+                            <span className="composer-reply-body">{replyTo.body}</span>
+                        </div>
+                        <button className="ghost-btn" type="button" onClick={() => setReplyTo(null)}>
+                            Cancel
+                        </button>
+                    </div>
+                )}
                 <input
                     value={draft}
                     onChange={e => setDraft(e.target.value)}

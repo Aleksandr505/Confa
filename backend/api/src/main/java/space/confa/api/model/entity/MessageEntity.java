@@ -22,6 +22,7 @@ public class MessageEntity {
     private Long senderUserId;
     private MessageKind kind;
     private String body;
+    private Long replyToMessageId;
     private Instant createdAt;
     private Instant editedAt;
     private Instant deletedAt;

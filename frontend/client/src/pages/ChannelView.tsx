@@ -3,11 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAppShell } from './AppShell';
 import {
     type MessageDto,
+    addMessageReaction,
     createDmChannel,
     createChannelMessage,
     fetchChannelMessages,
+    removeMessageReaction,
 } from '../api';
+import { getUserIdentity } from '../lib/auth';
 import VoiceChannelView from './VoiceChannelView';
+import MessageTimeline from '../components/MessageTimeline';
 
 export default function ChannelViewPage() {
     const { channelId } = useParams();
@@ -16,10 +20,17 @@ export default function ChannelViewPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [draft, setDraft] = useState('');
+    const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
     const [showScrollDown, setShowScrollDown] = useState(false);
     const listRef = useRef<HTMLDivElement | null>(null);
     const autoScrollRef = useRef(true);
     const navigate = useNavigate();
+    const myUserId = useMemo(() => {
+        const identity = getUserIdentity();
+        if (!identity) return null;
+        const parsed = Number(identity);
+        return Number.isFinite(parsed) ? parsed : null;
+    }, []);
 
     const currentChannelId = channelId ? Number(channelId) : undefined;
     const channel = useMemo(
@@ -71,8 +82,9 @@ export default function ChannelViewPage() {
         if (!trimmed) return;
         setDraft('');
         try {
-            const msg = await createChannelMessage(currentChannelId, trimmed);
+            const msg = await createChannelMessage(currentChannelId, trimmed, replyTo?.id);
             setMessages(prev => [...prev, msg]);
+            setReplyTo(null);
         } catch (e: any) {
             setError(e?.message || 'Failed to send message');
         }
@@ -88,6 +100,18 @@ export default function ChannelViewPage() {
         }
     }
 
+    async function toggleReaction(message: MessageDto, emoji: string, reactedByMe: boolean) {
+        try {
+            const reactions = reactedByMe
+                ? await removeMessageReaction(message.id, emoji)
+                : await addMessageReaction(message.id, emoji);
+            setMessages(prev =>
+                prev.map(item => (item.id === message.id ? { ...item, reactions } : item)),
+            );
+        } catch (e) {
+            console.warn('Failed to toggle reaction', e);
+        }
+    }
 
     return (
         <section className="channel-view">
@@ -117,29 +141,15 @@ export default function ChannelViewPage() {
                         ) : messages.length === 0 ? (
                             <div className="empty-subtitle">No messages yet. Say hello.</div>
                         ) : (
-                            <div className="message-list" ref={listRef} onScroll={handleScroll}>
-                                {messages.map(msg => (
-                                    <div key={msg.id} className="message-row">
-                                        <button
-                                            className="message-avatar"
-                                            type="button"
-                                            onClick={() => openDm(msg.senderUserId ?? null)}
-                                            title="Open DM"
-                                        >
-                                            {String(msg.senderUserId ?? 'S').slice(0, 2)}
-                                        </button>
-                                        <div className="message-body">
-                                            <div className="message-meta">
-                                                <span className="message-author">User {msg.senderUserId ?? 'System'}</span>
-                                                <span className="message-time">
-                                                    {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString() : ''}
-                                                </span>
-                                            </div>
-                                            <div className="message-text">{msg.body}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <MessageTimeline
+                                messages={messages}
+                                myUserId={myUserId}
+                                listRef={listRef}
+                                onScroll={handleScroll}
+                                onAvatarClick={openDm}
+                                onReply={setReplyTo}
+                                onToggleReaction={toggleReaction}
+                            />
                         )}
                         {showScrollDown && (
                             <button className="scroll-down-btn" type="button" onClick={scrollToBottom}>
@@ -149,6 +159,19 @@ export default function ChannelViewPage() {
                     </div>
 
                     <div className="composer">
+                        {replyTo && (
+                            <div className="composer-reply">
+                                <div className="composer-reply-text">
+                                    <span className="composer-reply-author">
+                                        Replying to {replyTo.senderUsername || `User ${replyTo.senderUserId ?? 'System'}`}
+                                    </span>
+                                    <span className="composer-reply-body">{replyTo.body}</span>
+                                </div>
+                                <button className="ghost-btn" type="button" onClick={() => setReplyTo(null)}>
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
                         <input
                             value={draft}
                             onChange={e => setDraft(e.target.value)}

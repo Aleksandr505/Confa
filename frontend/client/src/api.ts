@@ -57,8 +57,13 @@ export type MessageDto = {
     id: number;
     channelId: number;
     senderUserId: number | null;
+    senderUsername?: string | null;
     kind: 'USER' | 'SYSTEM' | 'BOT';
     body: string;
+    replyToMessageId?: number | null;
+    replyToBody?: string | null;
+    replyToSenderUsername?: string | null;
+    reactions?: MessageReactionDto[];
     createdAt: string;
     editedAt?: string | null;
     deletedAt?: string | null;
@@ -67,6 +72,12 @@ export type MessageDto = {
 export type MessagePageDto = {
     items: MessageDto[];
     nextCursor?: number | null;
+};
+
+export type MessageReactionDto = {
+    emoji: string;
+    count: number;
+    reactedByMe: boolean;
 };
 
 export type DmSummary = {
@@ -147,10 +158,14 @@ export async function fetchChannelMessages(
     return http<MessagePageDto>(`/api/channels/${channelId}/messages${suffix}`, { method: 'GET' });
 }
 
-export async function createChannelMessage(channelId: number, body: string): Promise<MessageDto> {
+export async function createChannelMessage(
+    channelId: number,
+    body: string,
+    replyToMessageId?: number | null,
+): Promise<MessageDto> {
     return http<MessageDto>(`/api/channels/${channelId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ body }),
+        body: JSON.stringify({ body, replyToMessageId: replyToMessageId ?? null }),
     });
 }
 
@@ -170,11 +185,29 @@ export async function fetchDmMessages(
     return http<MessagePageDto>(`/api/dm/${peerId}/messages${suffix}`, { method: 'GET' });
 }
 
-export async function createDmMessage(peerId: number, body: string): Promise<MessageDto> {
+export async function createDmMessage(
+    peerId: number,
+    body: string,
+    replyToMessageId?: number | null,
+): Promise<MessageDto> {
     return http<MessageDto>(`/api/dm/${peerId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ body }),
+        body: JSON.stringify({ body, replyToMessageId: replyToMessageId ?? null }),
     });
+}
+
+export async function addMessageReaction(messageId: number, emoji: string): Promise<MessageReactionDto[]> {
+    return http<MessageReactionDto[]>(`/api/messages/${messageId}/reactions`, {
+        method: 'POST',
+        body: JSON.stringify({ emoji }),
+    });
+}
+
+export async function removeMessageReaction(messageId: number, emoji: string): Promise<MessageReactionDto[]> {
+    return http<MessageReactionDto[]>(
+        `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
+        { method: 'DELETE' },
+    );
 }
 
 export type RoomAccess = {

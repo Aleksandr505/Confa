@@ -8,12 +8,16 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import space.confa.api.model.dto.request.CreateMessageDto;
 import space.confa.api.model.dto.request.ReadChannelDto;
+import space.confa.api.model.dto.request.ToggleReactionDto;
 import space.confa.api.model.dto.request.UpdateMessageDto;
 import space.confa.api.model.dto.response.MessageDto;
 import space.confa.api.model.dto.response.MessagePageDto;
+import space.confa.api.model.dto.response.MessageReactionDto;
 import space.confa.api.model.dto.response.ReadStateDto;
 import space.confa.api.service.MessageService;
 import space.confa.api.service.ReadStateService;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -57,6 +61,32 @@ public class MessageController {
             @PathVariable Long messageId
     ) {
         return messageService.deleteMessage(getUserId(jwt), messageId);
+    }
+
+    @GetMapping("/messages/{messageId}/reactions")
+    public Mono<List<MessageReactionDto>> getMessageReactions(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long messageId
+    ) {
+        return messageService.getMessageReactions(getUserId(jwt), messageId);
+    }
+
+    @PostMapping("/messages/{messageId}/reactions")
+    public Mono<List<MessageReactionDto>> addReaction(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long messageId,
+            @Valid @RequestBody ToggleReactionDto dto
+    ) {
+        return messageService.addReaction(getUserId(jwt), messageId, dto.emoji());
+    }
+
+    @DeleteMapping("/messages/{messageId}/reactions/{emoji}")
+    public Mono<List<MessageReactionDto>> removeReaction(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long messageId,
+            @PathVariable String emoji
+    ) {
+        return messageService.removeReaction(getUserId(jwt), messageId, emoji);
     }
 
     @PostMapping("/channels/{channelId}/read")
