@@ -672,7 +672,8 @@ body.app-shell-mode button {
 
 .channel-message-bubble {
     display: inline-flex;
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 8px;
     border: 1px solid var(--shell-border);
     border-radius: 16px;
@@ -683,11 +684,16 @@ body.app-shell-mode button {
     position: relative;
 }
 
+.channel-message-bubble.has-reply {
+    min-width: clamp(180px, 28vw, 260px);
+}
+
 .channel-message-inline-time {
     font-size: 0.7rem;
     color: var(--shell-ink-soft);
     white-space: nowrap;
     line-height: 1.2;
+    align-self: flex-end;
 }
 
 .channel-message-reply-preview {
@@ -750,6 +756,8 @@ body.app-shell-mode button {
     transition: opacity 0.14s ease, transform 0.14s ease;
     display: flex;
     gap: 6px;
+    align-items: center;
+    white-space: nowrap;
 }
 
 .channel-message-row:hover .channel-message-actions {
@@ -766,6 +774,9 @@ body.app-shell-mode button {
     color: var(--shell-ink-soft);
     background: #fff;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
 }
 
 .channel-message-action-btn:hover:not(:disabled) {
@@ -792,6 +803,7 @@ body.app-shell-mode button {
 
 .composer-reply-text {
     min-width: 0;
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -809,11 +821,13 @@ body.app-shell-mode button {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .composer {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    gap: 8px;
     padding: 16px 20px;
     border-radius: var(--shell-radius);
     background: rgba(255, 255, 255, 0.9);
@@ -822,12 +836,27 @@ body.app-shell-mode button {
     margin-top: auto;
 }
 
-.composer input {
+.composer-input-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.composer textarea {
     flex: 1;
     border: none;
     background: transparent;
     font-size: 1rem;
     outline: none;
+    resize: none;
+    min-height: 24px;
+    max-height: 160px;
+    line-height: 1.4;
+    font-family: inherit;
+    overflow-y: hidden;
+    box-sizing: border-box;
+    padding: 2px 0;
+    display: block;
 }
 
 .empty-state {

@@ -116,7 +116,15 @@ export default function MessageTimeline({
                                         <span className="message-time">{timeLabel}</span>
                                     </div>
                                 )}
-                                <div className="message-text channel-message-bubble">
+                                <div
+                                    className={[
+                                        'message-text',
+                                        'channel-message-bubble',
+                                        msg.replyToMessageId ? 'has-reply' : '',
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' ')}
+                                >
                                     {msg.replyToMessageId && (
                                         <div className="channel-message-reply-preview">
                                             <span className="channel-message-reply-author">
@@ -128,28 +136,6 @@ export default function MessageTimeline({
                                         </div>
                                     )}
                                     <span>{msg.body}</span>
-                                    {!!msg.reactions?.length && (
-                                        <div className="channel-message-reactions">
-                                            {msg.reactions.map(reaction => (
-                                                <button
-                                                    key={`${msg.id}-${reaction.emoji}`}
-                                                    type="button"
-                                                    className={[
-                                                        'channel-message-reaction-btn',
-                                                        reaction.reactedByMe ? 'is-active' : '',
-                                                    ]
-                                                        .filter(Boolean)
-                                                        .join(' ')}
-                                                    onClick={() =>
-                                                        onToggleReaction?.(msg, reaction.emoji, reaction.reactedByMe)
-                                                    }
-                                                >
-                                                    <span>{reaction.emoji}</span>
-                                                    <span>{reaction.count}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
                                     <span className="channel-message-inline-time">{timeLabel}</span>
                                     <div className="channel-message-actions">
                                         <button
@@ -178,6 +164,28 @@ export default function MessageTimeline({
                                         </button>
                                     </div>
                                 </div>
+                                {!!msg.reactions?.length && (
+                                    <div className="channel-message-reactions">
+                                        {msg.reactions.map(reaction => (
+                                            <button
+                                                key={`${msg.id}-${reaction.emoji}`}
+                                                type="button"
+                                                className={[
+                                                    'channel-message-reaction-btn',
+                                                    reaction.reactedByMe ? 'is-active' : '',
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(' ')}
+                                                onClick={() =>
+                                                    onToggleReaction?.(msg, reaction.emoji, reaction.reactedByMe)
+                                                }
+                                            >
+                                                <span>{reaction.emoji}</span>
+                                                <span>{reaction.count}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

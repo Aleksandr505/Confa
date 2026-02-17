@@ -21,6 +21,7 @@ export default function DmViewPage() {
     const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
     const [showScrollDown, setShowScrollDown] = useState(false);
     const listRef = useRef<HTMLDivElement | null>(null);
+    const composerRef = useRef<HTMLTextAreaElement | null>(null);
     const autoScrollRef = useRef(true);
     const myUserId = useMemo(() => {
         const identity = getUserIdentity();
@@ -50,6 +51,20 @@ export default function DmViewPage() {
         if (!list || !autoScrollRef.current) return;
         list.scrollTop = list.scrollHeight;
     }, [messages]);
+
+    const autoResizeComposer = () => {
+        const textarea = composerRef.current;
+        if (!textarea) return;
+        textarea.style.height = '0px';
+        const maxHeight = 160;
+        const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+        textarea.style.height = `${Math.max(24, nextHeight)}px`;
+        textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+    };
+
+    useEffect(() => {
+        autoResizeComposer();
+    }, [draft]);
 
     const handleScroll = () => {
         const list = listRef.current;
@@ -147,20 +162,25 @@ export default function DmViewPage() {
                         </button>
                     </div>
                 )}
-                <input
-                    value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    placeholder={`Message ${peer?.peerUsername || 'user'}`}
-                    onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            sendMessage();
-                        }
-                    }}
-                />
-                <button className="primary-btn" type="button" onClick={sendMessage}>
-                    Send
-                </button>
+                <div className="composer-input-row">
+                    <textarea
+                        ref={composerRef}
+                        value={draft}
+                        onChange={e => setDraft(e.target.value)}
+                        onInput={autoResizeComposer}
+                        placeholder={`Message ${peer?.peerUsername || 'user'}`}
+                        rows={1}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                sendMessage();
+                            }
+                        }}
+                    />
+                    <button className="primary-btn" type="button" onClick={sendMessage}>
+                        Send
+                    </button>
+                </div>
             </div>
         </section>
     );
