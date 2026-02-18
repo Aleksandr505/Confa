@@ -1,5 +1,5 @@
 -- liquibase formatted sql
--- changeset Aleksandr505:20260217120000
+-- changeset Aleksandr505:20260218120840
 -- comment: add message replies and reactions
 
 alter table message

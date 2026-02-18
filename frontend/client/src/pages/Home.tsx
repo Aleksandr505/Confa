@@ -1,6 +1,6 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createRoom, fetchMyRoomsSummary, type RoomAccessSummary } from '../api';
+import { createRoom, fetchMyRoomsSummary, type RoomAccessSummary, uploadMyAvatar } from '../api';
 import '../styles/login.css';
 import '../styles/home.css';
 
@@ -18,6 +18,9 @@ export default function HomePage() {
     const [err, setErr] = useState<string | null>(null);
     const [roomName, setRoomName] = useState('my-room');
     const [creating, setCreating] = useState(false);
+    const [avatarBusy, setAvatarBusy] = useState(false);
+    const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
+    const avatarInputRef = useRef<HTMLInputElement | null>(null);
     const nav = useNavigate();
 
     useEffect(() => {
@@ -100,6 +103,23 @@ export default function HomePage() {
         }
     }
 
+    async function onAvatarSelected(file?: File | null) {
+        if (!file) return;
+        setAvatarBusy(true);
+        setAvatarMessage(null);
+        try {
+            await uploadMyAvatar(file, 'GLOBAL');
+            setAvatarMessage('Аватар обновлён');
+        } catch (e: any) {
+            setAvatarMessage(e?.message || 'Не удалось загрузить аватар');
+        } finally {
+            setAvatarBusy(false);
+            if (avatarInputRef.current) {
+                avatarInputRef.current.value = '';
+            }
+        }
+    }
+
     return (
         <div className="auth-root client-theme home-root">
             <a
@@ -111,9 +131,26 @@ export default function HomePage() {
             >
                 ⦿
             </a>
+            <button
+                className="upload-avatar-btn"
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={avatarBusy}
+                title="Upload avatar"
+            >
+                {avatarBusy ? '…' : '☺'}
+            </button>
+            <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/png,image/jpeg"
+                style={{ display: 'none' }}
+                onChange={e => onAvatarSelected(e.target.files?.[0])}
+            />
             <div className="auth-card">
                 <h1 className="auth-title">Confa</h1>
                 <p className="auth-subtitle">Комнаты:</p>
+                {avatarMessage && <div className="alert">{avatarMessage}</div>}
 
                 {err && <div className="alert alert-error">{err}</div>}
                 {loading ? (

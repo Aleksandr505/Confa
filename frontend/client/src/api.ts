@@ -80,6 +80,16 @@ export type MessageReactionDto = {
     reactedByMe: boolean;
 };
 
+export type AvatarScopeType = 'GLOBAL' | 'WORKSPACE' | 'ROOM';
+
+export type AvatarViewDto = {
+    userId: number;
+    assetId?: number | null;
+    scopeType?: AvatarScopeType | null;
+    contentUrl?: string | null;
+    updatedAt?: string | null;
+};
+
 export type DmSummary = {
     channelId: number;
     peerUserId: number;
@@ -208,6 +218,52 @@ export async function removeMessageReaction(messageId: number, emoji: string): P
         `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
         { method: 'DELETE' },
     );
+}
+
+export async function uploadMyAvatar(
+    file: File,
+    scopeType: AvatarScopeType = 'GLOBAL',
+    workspaceId?: number,
+    roomName?: string,
+): Promise<AvatarViewDto> {
+    const params = new URLSearchParams();
+    params.set('scopeType', scopeType);
+    if (workspaceId) params.set('workspaceId', String(workspaceId));
+    if (roomName) params.set('roomName', roomName);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const form = new FormData();
+    form.append('file', file);
+
+    return http<AvatarViewDto>(`/api/avatars/me${suffix}`, {
+        method: 'PUT',
+        body: form,
+    });
+}
+
+export async function resolveAvatar(userId: number, workspaceId?: number, roomName?: string): Promise<AvatarViewDto> {
+    const params = new URLSearchParams();
+    params.set('userId', String(userId));
+    if (workspaceId) params.set('workspaceId', String(workspaceId));
+    if (roomName) params.set('roomName', roomName);
+    return http<AvatarViewDto>(`/api/avatars/resolve?${params.toString()}`, {
+        method: 'GET',
+    });
+}
+
+export async function resolveAvatarsBatch(
+    userIds: number[],
+    workspaceId?: number,
+    roomName?: string,
+): Promise<AvatarViewDto[]> {
+    return http<AvatarViewDto[]>('/api/avatars/resolve-batch', {
+        method: 'POST',
+        body: JSON.stringify({
+            userIds,
+            workspaceId,
+            roomName,
+        }),
+    });
 }
 
 export type RoomAccess = {

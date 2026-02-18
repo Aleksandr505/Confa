@@ -42,15 +42,45 @@ export default function ChannelViewPage() {
 
     useEffect(() => {
         if (!currentChannelId || isVoice) return;
-        setLoading(true);
-        setError(null);
-        fetchChannelMessages(currentChannelId)
-            .then(page => {
+        let active = true;
+
+        const mergeById = (prev: MessageDto[], incoming: MessageDto[]) => {
+            const map = new Map<number, MessageDto>();
+            for (const msg of prev) map.set(msg.id, msg);
+            for (const msg of incoming) map.set(msg.id, msg);
+            return Array.from(map.values()).sort((a, b) => a.id - b.id);
+        };
+
+        const loadMessages = async (silent: boolean) => {
+            if (!silent) {
+                setLoading(true);
+                setError(null);
+            }
+            try {
+                const page = await fetchChannelMessages(currentChannelId);
+                if (!active) return;
                 const items = page.items.slice().reverse();
-                setMessages(items);
-            })
-            .catch(e => setError(e?.message || 'Failed to load messages'))
-            .finally(() => setLoading(false));
+                setMessages(prev => mergeById(prev, items));
+            } catch (e: any) {
+                if (!silent && active) {
+                    setError(e?.message || 'Failed to load messages');
+                }
+            } finally {
+                if (!silent && active) setLoading(false);
+            }
+        };
+
+        setMessages([]);
+        loadMessages(false);
+        const timer = window.setInterval(() => {
+            if (document.hidden) return;
+            loadMessages(true);
+        }, 3000);
+
+        return () => {
+            active = false;
+            window.clearInterval(timer);
+        };
     }, [currentChannelId, isVoice]);
     
     useEffect(() => {

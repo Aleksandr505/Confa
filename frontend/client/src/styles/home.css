@@ -23,3 +23,30 @@
     border-color: var(--client-accent);
     color: #fff;
 }
+
+.upload-avatar-btn {
+    position: absolute;
+    top: 18px;
+    right: 66px;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(15, 23, 42, 0.8);
+    color: var(--client-fg);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.5);
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.upload-avatar-btn:hover:not(:disabled) {
+    border-color: var(--client-accent);
+    color: #fff;
+}
+
+.upload-avatar-btn:disabled {
+    opacity: 0.7;
+    cursor: default;
+}

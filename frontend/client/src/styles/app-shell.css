@@ -760,6 +760,16 @@ body.app-shell-mode button {
     white-space: nowrap;
 }
 
+.channel-message-row.is-own .channel-message-actions {
+    right: 10px;
+    left: auto;
+}
+
+.channel-message-row.is-other .channel-message-actions {
+    left: 10px;
+    right: auto;
+}
+
 .channel-message-row:hover .channel-message-actions {
     opacity: 1;
     pointer-events: auto;

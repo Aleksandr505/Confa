@@ -53,12 +53,13 @@ import {
     disableRoomAgents,
     fetchMyRooms,
     createInvite,
+    resolveAvatarsBatch,
     type RoomAccess,
     type RoomInvite,
 } from '../api';
 import '../styles/livekit-theme.css';
 import { getUserIdentity, isAdmin } from '../lib/auth.ts';
-import { getAvatarColor, getAvatarUrl } from '../lib/avatar';
+import { getAvatarColor, getAvatarUrl, setAvatarUrlOverride } from '../lib/avatar';
 import { ParticipantEvent, Track } from 'livekit-client';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
@@ -123,6 +124,10 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
     const [inviteCopied, setInviteCopied] = useState(false);
     const [volumes, setVolumes] = useState<Record<string, number>>({});
     const [screenShareVolumes, setScreenShareVolumes] = useState<Record<string, number>>({});
+    const [avatarRefreshTick, setAvatarRefreshTick] = useState(0);
+    const handleAvatarsResolved = useCallback(() => {
+        setAvatarRefreshTick(v => v + 1);
+    }, []);
 
     const isAdminUser = isAdmin();
 
@@ -683,6 +688,10 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
 
 
                 <PermissionBanner issue={permIssue} clearIssue={() => setPermIssue(null)} />
+                <AvatarSync
+                    roomName={resolvedRoomId}
+                    onResolved={handleAvatarsResolved}
+                />
                 <VolumesPanel
                     open={volumePanelOpen}
                     onClose={() => setVolumePanelOpen(false)}
@@ -694,13 +703,90 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
                 <ParticipantJoinTone />
 
                 <main className="lk-main">
-                    <BrandedVideoConference disableChat={hideChat || embedded} />
+                    <BrandedVideoConference
+                        disableChat={hideChat || embedded}
+                        avatarRefreshTick={avatarRefreshTick}
+                    />
                 </main>
 
                 <StartAudio label="Включить звук в браузере" />
             </LiveKitRoom>
         </div>
     );
+}
+
+function AvatarSync({
+    roomName,
+    onResolved,
+}: {
+    roomName: string;
+    onResolved: () => void;
+}) {
+    const participants = useRemoteParticipants();
+    const room = useRoomContext();
+
+    const userIds = useMemo(() => {
+        const ids = new Set<number>();
+        const localIdentity = room.localParticipant?.identity;
+        if (localIdentity) {
+            const parsed = Number(localIdentity);
+            if (Number.isFinite(parsed) && parsed > 0) ids.add(parsed);
+        }
+        for (const participant of participants) {
+            const parsed = Number(participant.identity);
+            if (Number.isFinite(parsed) && parsed > 0) ids.add(parsed);
+        }
+        return Array.from(ids).sort((a, b) => a - b);
+    }, [participants, room.localParticipant?.identity]);
+
+    useEffect(() => {
+        if (userIds.length === 0) return;
+        let cancelled = false;
+        const validateUrl = (url: string) =>
+            new Promise<boolean>(resolve => {
+                const img = new Image();
+                img.onload = () => resolve(true);
+                img.onerror = () => resolve(false);
+                img.src = url;
+            });
+
+        const sync = async () => {
+            try {
+                const items = await resolveAvatarsBatch(userIds, undefined, roomName);
+                if (cancelled) return;
+                for (const item of items) {
+                    const identity = String(item.userId);
+                    if (item.contentUrl) {
+                        const resolvedUrl = item.contentUrl.startsWith('http')
+                            ? item.contentUrl
+                            : `${import.meta.env.VITE_API_BASE}${item.contentUrl}`;
+                        const isOk = await validateUrl(resolvedUrl);
+                        setAvatarUrlOverride(identity, isOk ? resolvedUrl : null);
+                    } else {
+                        setAvatarUrlOverride(identity, null);
+                    }
+                }
+                onResolved();
+            } catch (e) {
+                if (!cancelled) {
+                    console.warn('Failed to sync avatars', e);
+                }
+            }
+        };
+
+        void sync();
+        const timer = window.setInterval(() => {
+            if (document.hidden) return;
+            void sync();
+        }, 15000);
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(timer);
+        };
+    }, [onResolved, roomName, userIds]);
+
+    return null;
 }
 
 function VolumesPanel({
@@ -1076,7 +1162,13 @@ function BrandedParticipantTile(props: ParticipantTileProps) {
     );
 }
 
-function BrandedVideoConference({ disableChat }: { disableChat?: boolean }) {
+function BrandedVideoConference({
+    disableChat,
+    avatarRefreshTick,
+}: {
+    disableChat?: boolean;
+    avatarRefreshTick: number;
+}) {
     const [widgetState, setWidgetState] = useState<WidgetState>({
         showChat: false,
         unreadMessages: 0,
@@ -1194,7 +1286,7 @@ function BrandedVideoConference({ disableChat }: { disableChat?: boolean }) {
     };
 
     return (
-        <div className="lk-video-conference">
+        <div className="lk-video-conference" data-avatar-refresh={avatarRefreshTick}>
             <LayoutContextProvider value={layoutContext} onWidgetChange={state => setWidgetState(state)}>
                 <div className="lk-video-conference-inner">
                     {!focusTrack ? (
