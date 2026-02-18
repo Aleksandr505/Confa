@@ -230,8 +230,6 @@ export default function HomePage() {
             <a
                 className="switch-to-shell"
                 href="/app"
-                target="_blank"
-                rel="noreferrer"
                 title="Open Messenger"
             >
                 <img src="/chat_logo.png" alt="Messenger" className="switch-to-shell-logo" />

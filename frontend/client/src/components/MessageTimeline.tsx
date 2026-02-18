@@ -66,6 +66,7 @@ const COMMON_REACTION_EMOJIS = [
     '🙏', '😊', '😍', '😮', '😢',
     '🎉', '💯', '👌', '🤝', '🤔',
 ];
+const MAX_REACTIONS_PER_MESSAGE = 3;
 
 export default function MessageTimeline({
     messages,
@@ -79,6 +80,16 @@ export default function MessageTimeline({
     onToggleReaction,
 }: MessageTimelineProps) {
     const [openReactionPickerFor, setOpenReactionPickerFor] = useState<number | null>(null);
+
+    function myReactionCount(message: MessageDto): number {
+        return message.reactions?.filter(reaction => reaction.reactedByMe).length ?? 0;
+    }
+
+    function canToggleReaction(message: MessageDto, emoji: string): boolean {
+        const existing = message.reactions?.find(reaction => reaction.emoji === emoji);
+        if (existing?.reactedByMe) return true;
+        return myReactionCount(message) < MAX_REACTIONS_PER_MESSAGE;
+    }
 
     async function copyMessage(body: string) {
         if (!body) return;
@@ -196,11 +207,14 @@ export default function MessageTimeline({
                                             <div className="channel-message-emoji-picker">
                                                 {COMMON_REACTION_EMOJIS.map(emoji => {
                                                     const existing = msg.reactions?.find(r => r.emoji === emoji);
+                                                    const allowed = canToggleReaction(msg, emoji);
                                                     return (
                                                         <button
                                                             key={`${msg.id}-pick-${emoji}`}
                                                             type="button"
                                                             className="channel-message-emoji-btn"
+                                                            disabled={!allowed}
+                                                            title={!allowed ? 'Max 3 reactions per message' : undefined}
                                                             onClick={() => {
                                                                 onToggleReaction?.(
                                                                     msg,
@@ -230,6 +244,12 @@ export default function MessageTimeline({
                                                 ]
                                                     .filter(Boolean)
                                                     .join(' ')}
+                                                disabled={!canToggleReaction(msg, reaction.emoji)}
+                                                title={
+                                                    !canToggleReaction(msg, reaction.emoji)
+                                                        ? 'Max 3 reactions per message'
+                                                        : undefined
+                                                }
                                                 onClick={() =>
                                                     onToggleReaction?.(msg, reaction.emoji, reaction.reactedByMe)
                                                 }

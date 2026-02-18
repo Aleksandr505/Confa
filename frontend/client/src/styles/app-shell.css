@@ -320,6 +320,32 @@ body.app-shell-mode button {
     padding: 24px 18px;
 }
 
+.info-home-link {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid rgba(26, 27, 31, 0.14);
+    background: #ffffff;
+    box-shadow: var(--shell-shadow);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    margin-left: auto;
+    margin-bottom: 12px;
+}
+
+.info-home-link:hover {
+    border-color: rgba(255, 107, 61, 0.35);
+    transform: translateY(-1px);
+}
+
+.info-home-link-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
 .info-card {
     padding: 16px;
     border-radius: 16px;

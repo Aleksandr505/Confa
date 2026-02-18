@@ -127,13 +127,14 @@ export default function AppShellLayout() {
         const parsed = Number(identity);
         return Number.isFinite(parsed) ? parsed : null;
     }, []);
-    const sortedWorkspaceUsers = useMemo(() => {
-        if (workspaceUsers.length === 0) return [];
-        if (!myUserId) return workspaceUsers;
-        const me = workspaceUsers.filter(user => user.id === myUserId);
-        const others = workspaceUsers.filter(user => user.id !== myUserId);
-        return [...me, ...others];
-    }, [workspaceUsers, myUserId]);
+    const currentWorkspaceUser = useMemo(
+        () => (myUserId ? workspaceUsers.find(user => user.id === myUserId) : undefined),
+        [workspaceUsers, myUserId],
+    );
+    const workspaceUsersWithoutMe = useMemo(
+        () => (myUserId ? workspaceUsers.filter(user => user.id !== myUserId) : workspaceUsers),
+        [workspaceUsers, myUserId],
+    );
     const workspaceUserIdsKey = useMemo(
         () => workspaceUsers.map(user => user.id).sort((a, b) => a - b).join(','),
         [workspaceUsers],
@@ -416,7 +417,11 @@ export default function AppShellLayout() {
     useEffect(() => {
         if (!activeWorkspaceId || isDmMode) {
             setWorkspaceUsers([]);
-            setWorkspaceUserAvatarById({});
+            setWorkspaceUserAvatarById(prev => {
+                if (!myUserId) return {};
+                const mine = prev[myUserId];
+                return mine ? { [myUserId]: mine } : {};
+            });
             return;
         }
         let cancelled = false;
@@ -435,14 +440,18 @@ export default function AppShellLayout() {
         return () => {
             cancelled = true;
         };
-    }, [activeWorkspaceId, isDmMode]);
+    }, [activeWorkspaceId, isDmMode, myUserId]);
 
     useEffect(() => {
         const ids = workspaceUserIdsKey
             ? workspaceUserIdsKey.split(',').map(v => Number(v)).filter(v => Number.isFinite(v) && v > 0)
             : [];
         if (ids.length === 0) {
-            setWorkspaceUserAvatarById({});
+            setWorkspaceUserAvatarById(prev => {
+                if (!myUserId) return {};
+                const mine = prev[myUserId];
+                return mine ? { [myUserId]: mine } : {};
+            });
             return;
         }
         let cancelled = false;
@@ -462,7 +471,7 @@ export default function AppShellLayout() {
         return () => {
             cancelled = true;
         };
-    }, [workspaceUserIdsKey]);
+    }, [workspaceUserIdsKey, myUserId]);
 
     useEffect(() => {
         if (!profileOpen) return;
@@ -660,34 +669,66 @@ export default function AppShellLayout() {
                 </main>
 
                 <aside className="rail info-rail">
+                    <a
+                        className="info-home-link"
+                        href="/"
+                        title="Go to conferences home"
+                        aria-label="Go to conferences home"
+                    >
+                        <img src="/conference_logo.png" alt="Conference" className="info-home-link-logo" />
+                    </a>
                     <div className="info-card">
                         <div className="info-title">Workspace users</div>
+                        {myUserId && (
+                            <button
+                                type="button"
+                                className="workspace-user-item is-me"
+                                onClick={() => {
+                                    const next = !profileOpen;
+                                    setProfileOpen(next);
+                                    setAvatarMessage(null);
+                                    if (next) void loadProfileCard();
+                                }}
+                            >
+                                <span
+                                    className="workspace-user-avatar"
+                                    style={
+                                        workspaceUserAvatarById[myUserId]
+                                            ? { backgroundImage: `url(${workspaceUserAvatarById[myUserId]})` }
+                                            : undefined
+                                    }
+                                >
+                                    {!workspaceUserAvatarById[myUserId]
+                                        ? initialsFromName(profile?.username || currentWorkspaceUser?.username || 'You')
+                                        : null}
+                                </span>
+                                <span className="workspace-user-meta">
+                                    <span className="workspace-user-name">
+                                        {profile?.username || currentWorkspaceUser?.username || 'You'}
+                                    </span>
+                                    <span className="workspace-user-role">
+                                        {profile?.role || currentWorkspaceUser?.role || 'USER'}
+                                    </span>
+                                </span>
+                                <span className="workspace-user-action">Profile</span>
+                            </button>
+                        )}
                         {isDmMode ? (
                             <div className="info-sub">Open a workspace channel to see members</div>
                         ) : loadingWorkspaceUsers ? (
                             <div className="info-sub">Loading users…</div>
-                        ) : sortedWorkspaceUsers.length === 0 ? (
+                        ) : workspaceUsersWithoutMe.length === 0 ? (
                             <div className="info-sub">No users in this workspace</div>
                         ) : (
                             <div className="workspace-users-list">
-                                {sortedWorkspaceUsers.map((user, index) => {
-                                    const isMe = myUserId !== null && user.id === myUserId;
+                                {workspaceUsersWithoutMe.map(user => {
                                     const avatarUrl = workspaceUserAvatarById[user.id];
                                     return (
                                         <button
                                             key={user.id}
                                             type="button"
-                                            className={`workspace-user-item${isMe ? ' is-me' : ''}`}
-                                            onClick={() => {
-                                                if (isMe) {
-                                                    const next = !profileOpen;
-                                                    setProfileOpen(next);
-                                                    setAvatarMessage(null);
-                                                    if (next) void loadProfileCard();
-                                                    return;
-                                                }
-                                                void openDmWithUser(user.id);
-                                            }}
+                                            className="workspace-user-item"
+                                            onClick={() => void openDmWithUser(user.id)}
                                         >
                                             <span
                                                 className="workspace-user-avatar"
@@ -696,13 +737,10 @@ export default function AppShellLayout() {
                                                 {!avatarUrl ? initialsFromName(user.username) : null}
                                             </span>
                                             <span className="workspace-user-meta">
-                                                <span className="workspace-user-name">
-                                                    {isMe ? 'You' : user.username}
-                                                </span>
+                                                <span className="workspace-user-name">{user.username}</span>
                                                 <span className="workspace-user-role">{user.role}</span>
                                             </span>
-                                            {!isMe && <span className="workspace-user-action">DM</span>}
-                                            {isMe && index === 0 && <span className="workspace-user-action">Profile</span>}
+                                            <span className="workspace-user-action">DM</span>
                                         </button>
                                     );
                                 })}
