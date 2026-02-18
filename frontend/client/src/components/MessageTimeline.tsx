@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { MessageDto } from '../api';
 
 type MessageTimelineProps = {
@@ -59,6 +60,13 @@ function initialsFromName(value?: string | null): string {
     return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase() || '?';
 }
 
+const COMMON_REACTION_EMOJIS = [
+    '🗿', '🐳', '😈', '🫡', '💀',
+    '👍', '❤️', '😂', '🔥', '👏',
+    '🙏', '😊', '😍', '😮', '😢',
+    '🎉', '💯', '👌', '🤝', '🤔',
+];
+
 export default function MessageTimeline({
     messages,
     myUserId,
@@ -70,6 +78,8 @@ export default function MessageTimeline({
     onReply,
     onToggleReaction,
 }: MessageTimelineProps) {
+    const [openReactionPickerFor, setOpenReactionPickerFor] = useState<number | null>(null);
+
     async function copyMessage(body: string) {
         if (!body) return;
         try {
@@ -100,6 +110,7 @@ export default function MessageTimeline({
                                 'message-row',
                                 'channel-message-row',
                                 own ? 'is-own' : 'is-other',
+                                openReactionPickerFor === msg.id ? 'has-open-picker' : '',
                                 compact ? 'is-compact' : '',
                             ]
                                 .filter(Boolean)
@@ -175,13 +186,36 @@ export default function MessageTimeline({
                                         <button
                                             type="button"
                                             className="channel-message-action-btn"
-                                            onClick={() => {
-                                                const existing = msg.reactions?.find(r => r.emoji === '👍');
-                                                onToggleReaction?.(msg, '👍', !!existing?.reactedByMe);
-                                            }}
+                                            onClick={() =>
+                                                setOpenReactionPickerFor(prev => (prev === msg.id ? null : msg.id))
+                                            }
                                         >
-                                            +👍
+                                            React
                                         </button>
+                                        {openReactionPickerFor === msg.id && (
+                                            <div className="channel-message-emoji-picker">
+                                                {COMMON_REACTION_EMOJIS.map(emoji => {
+                                                    const existing = msg.reactions?.find(r => r.emoji === emoji);
+                                                    return (
+                                                        <button
+                                                            key={`${msg.id}-pick-${emoji}`}
+                                                            type="button"
+                                                            className="channel-message-emoji-btn"
+                                                            onClick={() => {
+                                                                onToggleReaction?.(
+                                                                    msg,
+                                                                    emoji,
+                                                                    !!existing?.reactedByMe,
+                                                                );
+                                                                setOpenReactionPickerFor(null);
+                                                            }}
+                                                        >
+                                                            {emoji}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 {!!msg.reactions?.length && (

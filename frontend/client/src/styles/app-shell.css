@@ -710,6 +710,8 @@ body.app-shell-mode button {
 
 .channel-message-row {
     align-items: flex-end;
+    position: relative;
+    z-index: 0;
 }
 
 .channel-message-row.is-own {
@@ -721,11 +723,12 @@ body.app-shell-mode button {
 }
 
 .channel-message-row.is-own .channel-message-body {
-    align-items: flex-end;
+    align-items: stretch;
 }
 
 .channel-message-row.is-own .channel-message-meta {
     justify-content: flex-end;
+    align-self: flex-end;
 }
 
 .channel-message-row.is-own .channel-message-bubble {
@@ -733,6 +736,7 @@ body.app-shell-mode button {
     color: #fff;
     border: none;
     border-bottom-right-radius: 8px;
+    align-self: flex-end;
 }
 
 .channel-message-row.is-own .channel-message-inline-time {
@@ -847,6 +851,12 @@ body.app-shell-mode button {
     gap: 6px;
     flex-wrap: wrap;
     margin-top: 4px;
+    max-width: 100%;
+}
+
+.channel-message-row.is-own .channel-message-reactions {
+    align-self: flex-end;
+    justify-content: flex-end;
 }
 
 .channel-message-reaction-btn {
@@ -898,6 +908,16 @@ body.app-shell-mode button {
     transform: translateY(0);
 }
 
+.channel-message-row.has-open-picker {
+    z-index: 6;
+}
+
+.channel-message-row.has-open-picker .channel-message-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
 .channel-message-action-btn {
     border: 1px solid rgba(26, 27, 31, 0.12);
     border-radius: 999px;
@@ -919,6 +939,42 @@ body.app-shell-mode button {
 .channel-message-action-btn:disabled {
     cursor: default;
     opacity: 0.65;
+}
+
+.channel-message-emoji-picker {
+    position: absolute;
+    top: 30px;
+    right: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    padding: 6px;
+    border-radius: 10px;
+    border: 1px solid rgba(26, 27, 31, 0.14);
+    background: #fff;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+    min-width: 170px;
+}
+
+.channel-message-row.is-other .channel-message-emoji-picker {
+    left: 0;
+    right: auto;
+}
+
+.channel-message-emoji-btn {
+    border: 1px solid rgba(26, 27, 31, 0.1);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.92rem;
+    line-height: 1;
+    padding: 6px 0;
+}
+
+.channel-message-emoji-btn:hover {
+    background: #fff7ee;
+    border-color: rgba(224, 97, 47, 0.32);
 }
 
 .composer-reply {
