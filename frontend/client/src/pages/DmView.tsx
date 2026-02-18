@@ -7,6 +7,7 @@ import {
     createDmMessage,
     fetchDmMessages,
     removeMessageReaction,
+    resolveAvatarsBatch,
 } from '../api';
 import { getUserIdentity } from '../lib/auth';
 import MessageTimeline from '../components/MessageTimeline';
@@ -20,6 +21,7 @@ export default function DmViewPage() {
     const [draft, setDraft] = useState('');
     const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
     const [showScrollDown, setShowScrollDown] = useState(false);
+    const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<number, string>>({});
     const listRef = useRef<HTMLDivElement | null>(null);
     const composerRef = useRef<HTMLTextAreaElement | null>(null);
     const autoScrollRef = useRef(true);
@@ -35,6 +37,18 @@ export default function DmViewPage() {
         () => dms.find(dm => dm.peerUserId === numericPeerId),
         [dms, numericPeerId],
     );
+    const avatarUserIds = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    messages
+                        .map(msg => msg.senderUserId)
+                        .filter((id): id is number => typeof id === "number" && id > 0),
+                ),
+            ).sort((a, b) => a - b),
+        [messages],
+    );
+    const avatarUsersKey = avatarUserIds.join(',');
 
     useEffect(() => {
         if (!numericPeerId) return;
@@ -78,6 +92,37 @@ export default function DmViewPage() {
             window.clearInterval(timer);
         };
     }, [numericPeerId]);
+
+    useEffect(() => {
+        if (avatarUserIds.length === 0) {
+            setAvatarUrlByUserId({});
+            return;
+        }
+        let cancelled = false;
+        const syncAvatars = async () => {
+            try {
+                const items = await resolveAvatarsBatch(avatarUserIds);
+                if (cancelled) return;
+                const next: Record<number, string> = {};
+                for (const item of items) {
+                    if (!item.contentUrl) continue;
+                    const resolvedUrl = item.contentUrl.startsWith('http')
+                        ? item.contentUrl
+                        : `${import.meta.env.VITE_API_BASE}${item.contentUrl}`;
+                    next[item.userId] = resolvedUrl;
+                }
+                setAvatarUrlByUserId(next);
+            } catch (e) {
+                if (!cancelled) console.warn('Failed to sync DM message avatars', e);
+            }
+        };
+
+        void syncAvatars();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [avatarUsersKey]);
     
     useEffect(() => {
         const list = listRef.current;
@@ -170,6 +215,7 @@ export default function DmViewPage() {
                         myUserId={myUserId}
                         listRef={listRef}
                         onScroll={handleScroll}
+                        avatarUrlByUserId={avatarUrlByUserId}
                         onReply={setReplyTo}
                         onToggleReaction={toggleReaction}
                     />

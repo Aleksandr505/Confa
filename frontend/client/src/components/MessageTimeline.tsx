@@ -5,6 +5,7 @@ type MessageTimelineProps = {
     myUserId: number | null;
     listRef: React.RefObject<HTMLDivElement | null>;
     onScroll: () => void;
+    avatarUrlByUserId?: Record<number, string>;
     onAvatarClick?: (userId: number | null) => void;
     showDateDividers?: boolean;
     onReply?: (message: MessageDto) => void;
@@ -50,11 +51,20 @@ function formatDayDivider(value?: string | null): string {
     return target.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function initialsFromName(value?: string | null): string {
+    const raw = (value || '').trim();
+    if (!raw) return '?';
+    const parts = raw.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase() || '?';
+}
+
 export default function MessageTimeline({
     messages,
     myUserId,
     listRef,
     onScroll,
+    avatarUrlByUserId,
     onAvatarClick,
     showDateDividers = true,
     onReply,
@@ -96,14 +106,24 @@ export default function MessageTimeline({
                                 .join(' ')}
                         >
                             {!own && !compact ? (
-                                <button
-                                    className="message-avatar"
-                                    type="button"
-                                    onClick={() => onAvatarClick?.(msg.senderUserId ?? null)}
-                                    title="Open DM"
-                                >
-                                    {String(msg.senderUserId ?? 'S').slice(0, 2)}
-                                </button>
+                                (() => {
+                                    const senderId = msg.senderUserId ?? null;
+                                    const avatarUrl = senderId ? avatarUrlByUserId?.[senderId] : undefined;
+                                    const fallback = initialsFromName(
+                                        msg.senderUsername || (senderId ? `User ${senderId}` : 'System'),
+                                    );
+                                    return (
+                                        <button
+                                            className="message-avatar"
+                                            type="button"
+                                            onClick={() => onAvatarClick?.(senderId)}
+                                            title="Open DM"
+                                            style={avatarUrl ? { backgroundImage: `url(${avatarUrl})` } : undefined}
+                                        >
+                                            {!avatarUrl ? fallback : null}
+                                        </button>
+                                    );
+                                })()
                             ) : (
                                 <div className="channel-message-avatar-gap" />
                             )}

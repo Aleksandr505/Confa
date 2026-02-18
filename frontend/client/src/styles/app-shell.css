@@ -281,6 +281,9 @@ body.app-shell-mode button {
     height: 32px;
     border-radius: 50%;
     background: linear-gradient(135deg, #ffe2c6, #ffd1b0);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     display: grid;
     place-items: center;
     font-size: 0.7rem;
@@ -546,6 +549,9 @@ body.app-shell-mode button {
     height: 36px;
     border-radius: 12px;
     background: #ffe9d1;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     display: grid;
     place-items: center;
     font-weight: 700;

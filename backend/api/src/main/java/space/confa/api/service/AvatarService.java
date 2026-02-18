@@ -89,8 +89,9 @@ public class AvatarService {
 
     public Mono<AvatarViewDto> resolveAvatar(Long targetUserId, Long workspaceId, String roomName) {
         return ensureUserExists(targetUserId)
-                .then(resolveRoomId(roomName))
-                .flatMap(roomId -> resolveBinding(targetUserId, workspaceId, roomId))
+                .then(resolveRoomId(roomName)
+                        .flatMap(roomId -> resolveBinding(targetUserId, workspaceId, roomId))
+                        .switchIfEmpty(resolveBinding(targetUserId, workspaceId, null)))
                 .flatMap(binding -> avatarAssetRepository.findById(binding.getAssetId())
                         .flatMap(asset -> toAvatarViewDto(
                                 targetUserId,

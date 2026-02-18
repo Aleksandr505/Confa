@@ -11,6 +11,7 @@ import {
     fetchDmList,
     fetchWorkspaceChannels,
     fetchWorkspaces,
+    resolveAvatarsBatch,
 } from '../api';
 
 type AppShellState = {
@@ -36,6 +37,18 @@ function slugify(value: string) {
         .replace(/[^a-z0-9_-]/g, '');
 }
 
+function initialsFromName(value: string) {
+    const parts = value.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase() || '?';
+}
+
+function toAbsoluteAvatarUrl(contentUrl?: string | null): string | undefined {
+    if (!contentUrl) return undefined;
+    return contentUrl.startsWith('http') ? contentUrl : `${import.meta.env.VITE_API_BASE}${contentUrl}`;
+}
+
 export function useAppShell() {
     const ctx = useContext(AppShellContext);
     if (!ctx) throw new Error('AppShellContext is not available');
@@ -50,6 +63,7 @@ export default function AppShellLayout() {
     const [workspaces, setWorkspaces] = useState<WorkspaceDto[]>([]);
     const [channels, setChannels] = useState<ChannelDto[]>([]);
     const [dms, setDms] = useState<DmSummary[]>([]);
+    const [dmAvatarUrlByUserId, setDmAvatarUrlByUserId] = useState<Record<number, string>>({});
     const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
     const [loadingChannels, setLoadingChannels] = useState(false);
     const [loadingDms, setLoadingDms] = useState(true);
@@ -205,6 +219,40 @@ export default function AppShellLayout() {
     }, []);
 
     useEffect(() => {
+        const userIds = Array.from(
+            new Set(
+                dms.map(dm => dm.peerUserId).filter((id): id is number => typeof id === 'number' && id > 0),
+            ),
+        );
+        if (userIds.length === 0) {
+            setDmAvatarUrlByUserId({});
+            return;
+        }
+
+        let cancelled = false;
+        const syncAvatars = async () => {
+            try {
+                const items = await resolveAvatarsBatch(userIds);
+                if (cancelled) return;
+                const next: Record<number, string> = {};
+                for (const item of items) {
+                    const url = toAbsoluteAvatarUrl(item.contentUrl);
+                    if (url) next[item.userId] = url;
+                }
+                setDmAvatarUrlByUserId(next);
+            } catch (e) {
+                if (!cancelled) console.warn('Failed to sync DM avatars', e);
+            }
+        };
+
+        void syncAvatars();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [dms]);
+
+    useEffect(() => {
         if (!activeWorkspaceId) return;
         let cancelled = false;
         setLoadingChannels(true);
@@ -346,8 +394,19 @@ export default function AppShellLayout() {
                                                 `dm-item${isActive ? ' active' : ''}`
                                             }
                                         >
-                                            <span className="dm-avatar">
-                                                {dm.peerUsername.slice(0, 2).toUpperCase()}
+                                            <span
+                                                className="dm-avatar"
+                                                style={
+                                                    dmAvatarUrlByUserId[dm.peerUserId]
+                                                        ? {
+                                                              backgroundImage: `url(${dmAvatarUrlByUserId[dm.peerUserId]})`,
+                                                          }
+                                                        : undefined
+                                                }
+                                            >
+                                                {!dmAvatarUrlByUserId[dm.peerUserId]
+                                                    ? initialsFromName(dm.peerUsername)
+                                                    : null}
                                             </span>
                                             <span className="dm-name">{dm.peerUsername}</span>
                                             <span className="dm-snippet">

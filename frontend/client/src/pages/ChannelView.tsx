@@ -8,6 +8,7 @@ import {
     createChannelMessage,
     fetchChannelMessages,
     removeMessageReaction,
+    resolveAvatarsBatch,
 } from '../api';
 import { getUserIdentity } from '../lib/auth';
 import VoiceChannelView from './VoiceChannelView';
@@ -22,6 +23,7 @@ export default function ChannelViewPage() {
     const [draft, setDraft] = useState('');
     const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
     const [showScrollDown, setShowScrollDown] = useState(false);
+    const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<number, string>>({});
     const listRef = useRef<HTMLDivElement | null>(null);
     const composerRef = useRef<HTMLTextAreaElement | null>(null);
     const autoScrollRef = useRef(true);
@@ -39,6 +41,18 @@ export default function ChannelViewPage() {
         [channels, currentChannelId],
     );
     const isVoice = channel?.type === 'VOICE';
+    const avatarUserIds = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    messages
+                        .map(msg => msg.senderUserId)
+                        .filter((id): id is number => typeof id === "number" && id > 0),
+                ),
+            ).sort((a, b) => a - b),
+        [messages],
+    );
+    const avatarUsersKey = avatarUserIds.join(',');
 
     useEffect(() => {
         if (!currentChannelId || isVoice) return;
@@ -82,6 +96,37 @@ export default function ChannelViewPage() {
             window.clearInterval(timer);
         };
     }, [currentChannelId, isVoice]);
+
+    useEffect(() => {
+        if (avatarUserIds.length === 0) {
+            setAvatarUrlByUserId({});
+            return;
+        }
+        let cancelled = false;
+        const syncAvatars = async () => {
+            try {
+                const items = await resolveAvatarsBatch(avatarUserIds);
+                if (cancelled) return;
+                const next: Record<number, string> = {};
+                for (const item of items) {
+                    if (!item.contentUrl) continue;
+                    const resolvedUrl = item.contentUrl.startsWith('http')
+                        ? item.contentUrl
+                        : `${import.meta.env.VITE_API_BASE}${item.contentUrl}`;
+                    next[item.userId] = resolvedUrl;
+                }
+                setAvatarUrlByUserId(next);
+            } catch (e) {
+                if (!cancelled) console.warn('Failed to sync channel message avatars', e);
+            }
+        };
+
+        void syncAvatars();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [avatarUsersKey]);
     
     useEffect(() => {
         const list = listRef.current;
@@ -191,6 +236,7 @@ export default function ChannelViewPage() {
                                 myUserId={myUserId}
                                 listRef={listRef}
                                 onScroll={handleScroll}
+                                avatarUrlByUserId={avatarUrlByUserId}
                                 onAvatarClick={openDm}
                                 onReply={setReplyTo}
                                 onToggleReaction={toggleReaction}
