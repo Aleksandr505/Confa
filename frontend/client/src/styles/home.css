@@ -24,7 +24,7 @@
     color: #fff;
 }
 
-.upload-avatar-btn {
+.profile-avatar-btn {
     position: absolute;
     top: 18px;
     right: 66px;
@@ -39,14 +39,91 @@
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.5);
     cursor: pointer;
     font-size: 1rem;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
-.upload-avatar-btn:hover:not(:disabled) {
+.profile-avatar-btn:hover:not(:disabled) {
     border-color: var(--client-accent);
     color: #fff;
 }
 
-.upload-avatar-btn:disabled {
+.profile-avatar-btn:disabled {
     opacity: 0.7;
     cursor: default;
+}
+
+.profile-popup {
+    position: absolute;
+    top: 66px;
+    right: 18px;
+    width: min(560px, calc(100vw - 36px));
+    max-height: min(70vh, 640px);
+    overflow: auto;
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.96);
+    color: var(--client-fg);
+    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.55);
+    padding: 16px;
+    z-index: 40;
+}
+
+.profile-popup-title {
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.profile-popup-empty {
+    color: rgba(226, 232, 240, 0.8);
+    font-size: 0.92rem;
+}
+
+.profile-meta {
+    display: grid;
+    gap: 4px;
+    font-size: 0.9rem;
+}
+
+.profile-upload-row {
+    margin-top: 12px;
+    margin-bottom: 10px;
+}
+
+.profile-avatars-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.profile-avatar-item {
+    display: grid;
+    grid-template-columns: 48px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(30, 41, 59, 0.55);
+}
+
+.profile-avatar-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.profile-avatar-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.profile-avatar-sub {
+    font-size: 0.78rem;
+    color: rgba(226, 232, 240, 0.8);
 }

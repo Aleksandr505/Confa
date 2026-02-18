@@ -18,6 +18,7 @@ import space.confa.api.infrastructure.db.repository.UserRepository;
 import space.confa.api.infrastructure.db.repository.WorkspaceMemberRepository;
 import space.confa.api.model.domain.AvatarScopeType;
 import space.confa.api.model.dto.response.AvatarViewDto;
+import space.confa.api.model.dto.response.MyAvatarAssetDto;
 import space.confa.api.model.entity.AvatarAssetEntity;
 import space.confa.api.model.entity.AvatarBindingEntity;
 import space.confa.api.model.entity.RoomEntity;
@@ -111,6 +112,42 @@ public class AvatarService {
         return Flux.fromIterable(unique)
                 .flatMapSequential(userId -> resolveAvatar(userId, workspaceId, roomName))
                 .collectList();
+    }
+
+    public Mono<List<MyAvatarAssetDto>> listMyAvatarAssets(Long userId) {
+        return ensureUserExists(userId)
+                .then(avatarBindingRepository.findLatestActiveByUserAndScope(userId, AvatarScopeType.GLOBAL)
+                        .map(AvatarBindingEntity::getAssetId)
+                        .defaultIfEmpty(-1L))
+                .flatMap(activeGlobalAssetId -> avatarAssetRepository.findAllByCreatedByUserId(userId)
+                        .flatMapSequential(asset -> toMyAvatarAssetDto(asset, activeGlobalAssetId))
+                        .collectList());
+    }
+
+    public Mono<AvatarViewDto> activateAvatar(
+            Long userId,
+            Long assetId,
+            AvatarScopeType scopeType,
+            Long workspaceId,
+            String roomName
+    ) {
+        AvatarScopeType safeScope = scopeType == null ? AvatarScopeType.GLOBAL : scopeType;
+        return ensureUserExists(userId)
+                .then(avatarAssetRepository.findById(assetId)
+                        .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Avatar not found"))))
+                .flatMap(asset -> {
+                    if (!userId.equals(asset.getCreatedByUserId())) {
+                        return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your avatar"));
+                    }
+                    return resolveScopeContext(userId, safeScope, workspaceId, roomName)
+                            .flatMap(scope -> activateBinding(userId, scope, asset.getId())
+                                    .flatMap(binding -> toAvatarViewDto(
+                                            userId,
+                                            asset,
+                                            binding.getScopeType(),
+                                            binding.getUpdatedAt()
+                                    )));
+                });
     }
 
     public Mono<AvatarContent> getAvatarContent(Long assetId) {
@@ -231,14 +268,43 @@ public class AvatarService {
 
     private Mono<AvatarBindingEntity> activateBinding(Long userId, ScopeContext scope, Long assetId) {
         return deactivateExistingBinding(userId, scope)
-                .then(avatarBindingRepository.save(AvatarBindingEntity.builder()
-                        .userId(userId)
-                        .scopeType(scope.scopeType())
-                        .workspaceId(scope.workspaceId())
-                        .roomId(scope.roomId())
-                        .assetId(assetId)
-                        .isActive(true)
-                        .build()));
+                .then(findReusableBinding(userId, scope, assetId)
+                        .flatMap(existing -> {
+                            existing.setIsActive(true);
+                            return avatarBindingRepository.save(existing);
+                        })
+                        .switchIfEmpty(avatarBindingRepository.save(AvatarBindingEntity.builder()
+                                .userId(userId)
+                                .scopeType(scope.scopeType())
+                                .workspaceId(scope.workspaceId())
+                                .roomId(scope.roomId())
+                                .assetId(assetId)
+                                .isActive(true)
+                                .build())));
+    }
+
+    private Mono<AvatarBindingEntity> findReusableBinding(Long userId, ScopeContext scope, Long assetId) {
+        if (scope.scopeType() == AvatarScopeType.WORKSPACE) {
+            return avatarBindingRepository.findLatestByUserAndWorkspaceScopeAndAsset(
+                    userId,
+                    AvatarScopeType.WORKSPACE,
+                    scope.workspaceId(),
+                    assetId
+            );
+        }
+        if (scope.scopeType() == AvatarScopeType.ROOM) {
+            return avatarBindingRepository.findLatestByUserAndRoomScopeAndAsset(
+                    userId,
+                    AvatarScopeType.ROOM,
+                    scope.roomId(),
+                    assetId
+            );
+        }
+        return avatarBindingRepository.findLatestByUserAndScopeAndAsset(
+                userId,
+                AvatarScopeType.GLOBAL,
+                assetId
+        );
     }
 
     private Mono<Void> deactivateExistingBinding(Long userId, ScopeContext scope) {
@@ -323,6 +389,37 @@ public class AvatarService {
                 .onErrorResume(error -> {
                     log.warn("Failed to generate presigned avatar URL assetId={}", asset.getId(), error);
                     return Mono.just(new AvatarViewDto(userId, asset.getId(), scopeType, null, safeUpdatedAt));
+                });
+    }
+
+    private Mono<MyAvatarAssetDto> toMyAvatarAssetDto(AvatarAssetEntity asset, Long activeGlobalAssetId) {
+        return Mono.fromCallable(() -> avatarStorageService.generatePresignedGetUrl(
+                        asset.getKeyPng(),
+                        Duration.ofSeconds(Math.max(60, avatarProp.presignTtlSeconds()))
+                ))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(url -> new MyAvatarAssetDto(
+                        asset.getId(),
+                        url,
+                        asset.getOriginalContentType(),
+                        asset.getOriginalSizeBytes(),
+                        asset.getWidth(),
+                        asset.getHeight(),
+                        asset.getCreatedAt(),
+                        asset.getId().equals(activeGlobalAssetId)
+                ))
+                .onErrorResume(error -> {
+                    log.warn("Failed to generate presigned avatar URL for assetId={}", asset.getId(), error);
+                    return Mono.just(new MyAvatarAssetDto(
+                            asset.getId(),
+                            null,
+                            asset.getOriginalContentType(),
+                            asset.getOriginalSizeBytes(),
+                            asset.getWidth(),
+                            asset.getHeight(),
+                            asset.getCreatedAt(),
+                            asset.getId().equals(activeGlobalAssetId)
+                    ));
                 });
     }
 

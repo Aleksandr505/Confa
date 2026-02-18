@@ -11,9 +11,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import space.confa.api.model.dto.request.ActivateAvatarDto;
 import space.confa.api.model.domain.AvatarScopeType;
 import space.confa.api.model.dto.request.ResolveAvatarsBatchDto;
 import space.confa.api.model.dto.response.AvatarViewDto;
+import space.confa.api.model.dto.response.MyAvatarAssetDto;
 import space.confa.api.service.AvatarService;
 
 import java.util.List;
@@ -61,6 +63,27 @@ public class AvatarController {
             @Valid @RequestBody ResolveAvatarsBatchDto dto
     ) {
         return avatarService.resolveAvatarsBatch(dto.userIds(), dto.workspaceId(), dto.roomName());
+    }
+
+    @GetMapping("/me/assets")
+    public Mono<List<MyAvatarAssetDto>> myAvatarAssets(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return avatarService.listMyAvatarAssets(userId(jwt));
+    }
+
+    @PostMapping("/me/activate")
+    public Mono<AvatarViewDto> activateMyAvatar(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ActivateAvatarDto dto
+    ) {
+        return avatarService.activateAvatar(
+                userId(jwt),
+                dto.assetId(),
+                dto.scopeType(),
+                dto.workspaceId(),
+                dto.roomName()
+        );
     }
 
     @GetMapping("/content/{assetId}")

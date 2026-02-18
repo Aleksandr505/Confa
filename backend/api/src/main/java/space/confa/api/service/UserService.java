@@ -8,6 +8,7 @@ import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import space.confa.api.infrastructure.db.repository.UserRepository;
@@ -15,12 +16,15 @@ import space.confa.api.model.domain.ConfaUser;
 import space.confa.api.model.domain.UserRole;
 import space.confa.api.model.dto.response.BootstrapDto;
 import space.confa.api.model.dto.response.BootstrapStatusDto;
+import space.confa.api.model.dto.response.MyProfileDto;
 import space.confa.api.model.dto.response.UserDto;
 import space.confa.api.model.entity.UserEntity;
 import space.confa.api.shared.mapper.UserMapper;
 
 import java.util.List;
 import java.util.UUID;
+
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Slf4j
 @Service
@@ -92,6 +96,17 @@ public class UserService implements ReactiveUserDetailsService {
     public Mono<UserDetails> findById(Long id) {
         return userRepository.findById(id)
                 .flatMap(this::userDetailsFrom);
+    }
+
+    public Mono<MyProfileDto> getMyProfile(Long userId) {
+        return userRepository.findById(userId)
+                .switchIfEmpty(Mono.error(new ResponseStatusException(NOT_FOUND, "User not found")))
+                .map(user -> new MyProfileDto(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getRole(),
+                        user.getCreatedAt()
+                ));
     }
 
     public Long getUserIdFromToken(String tokenValue) {

@@ -90,6 +90,24 @@ export type AvatarViewDto = {
     updatedAt?: string | null;
 };
 
+export type MyProfileDto = {
+    id: number;
+    username: string;
+    role: 'USER' | 'ADMIN';
+    createdAt?: string | null;
+};
+
+export type MyAvatarAssetDto = {
+    assetId: number;
+    contentUrl?: string | null;
+    originalContentType?: string | null;
+    originalSizeBytes?: number | null;
+    width?: number | null;
+    height?: number | null;
+    createdAt?: string | null;
+    activeGlobal: boolean;
+};
+
 export type DmSummary = {
     channelId: number;
     peerUserId: number;
@@ -262,6 +280,28 @@ export async function resolveAvatarsBatch(
             userIds,
             workspaceId,
             roomName,
+        }),
+    });
+}
+
+export async function fetchMyProfile(): Promise<MyProfileDto> {
+    return http<MyProfileDto>('/api/users/me', {
+        method: 'GET',
+    });
+}
+
+export async function fetchMyAvatarAssets(): Promise<MyAvatarAssetDto[]> {
+    return http<MyAvatarAssetDto[]>('/api/avatars/me/assets', {
+        method: 'GET',
+    });
+}
+
+export async function activateMyAvatar(assetId: number): Promise<AvatarViewDto> {
+    return http<AvatarViewDto>('/api/avatars/me/activate', {
+        method: 'POST',
+        body: JSON.stringify({
+            assetId,
+            scopeType: 'GLOBAL',
         }),
     });
 }
