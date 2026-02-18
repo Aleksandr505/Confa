@@ -39,6 +39,13 @@ export type WorkspaceDto = {
     createdAt: string;
 };
 
+export type WorkspaceUserDto = {
+    id: number;
+    username: string;
+    role: 'USER' | 'ADMIN';
+    joinedAt?: string | null;
+};
+
 export type ChannelType = 'TEXT' | 'VOICE' | 'DM';
 
 export type ChannelDto = {
@@ -129,6 +136,10 @@ export async function createWorkspace(payload: { name: string; slug: string }): 
 
 export async function fetchWorkspaceChannels(workspaceId: number): Promise<ChannelDto[]> {
     return http<ChannelDto[]>(`/api/workspaces/${workspaceId}/channels`, { method: 'GET' });
+}
+
+export async function fetchWorkspaceMembers(workspaceId: number): Promise<WorkspaceUserDto[]> {
+    return http<WorkspaceUserDto[]>(`/api/workspaces/${workspaceId}/members`, { method: 'GET' });
 }
 
 export async function createWorkspaceChannel(

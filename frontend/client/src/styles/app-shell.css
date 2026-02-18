@@ -351,6 +351,122 @@ body.app-shell-mode button {
     font-size: 0.9rem;
 }
 
+.workspace-users-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.workspace-user-item {
+    display: grid;
+    grid-template-columns: 34px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(26, 27, 31, 0.12);
+    background: #fff;
+    border-radius: 12px;
+    padding: 6px 8px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.workspace-user-item:hover {
+    border-color: rgba(255, 107, 61, 0.35);
+    background: #fff7ee;
+}
+
+.workspace-user-item.is-me {
+    border-color: rgba(44, 141, 131, 0.35);
+    background: rgba(44, 141, 131, 0.08);
+    margin-bottom: 4px;
+}
+
+.workspace-user-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #ffe2c6, #ffd1b0);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: grid;
+    place-items: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #7a3c22;
+}
+
+.workspace-user-meta {
+    display: grid;
+    gap: 1px;
+}
+
+.workspace-user-name {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--shell-ink);
+}
+
+.workspace-user-role {
+    font-size: 0.72rem;
+    color: var(--shell-ink-soft);
+}
+
+.workspace-user-action {
+    font-size: 0.72rem;
+    color: var(--shell-ink-soft);
+    border: 1px solid rgba(26, 27, 31, 0.12);
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+
+.profile-inline-popup {
+    margin-top: 10px;
+    max-height: 48vh;
+    overflow: auto;
+}
+
+.profile-upload-row {
+    margin-top: 8px;
+}
+
+.profile-avatars-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.profile-avatar-item {
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    border: 1px solid rgba(26, 27, 31, 0.12);
+    border-radius: 12px;
+    padding: 6px 8px;
+    background: #fff;
+}
+
+.profile-avatar-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #ffe2c6, #ffd1b0);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.profile-avatar-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.profile-avatar-sub {
+    font-size: 0.72rem;
+    color: var(--shell-ink-soft);
+}
+
 .channel-view {
     display: flex;
     flex-direction: column;

@@ -1,18 +1,28 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import '../styles/app-shell.css';
 import {
+    activateMyAvatar,
     type ChannelDto,
     type DmSummary,
+    type MyAvatarAssetDto,
+    type MyProfileDto,
     type WorkspaceDto,
+    type WorkspaceUserDto,
+    createDmChannel,
     createWorkspace,
     createWorkspaceChannel,
     createWorkspaceInvite,
     fetchDmList,
+    fetchMyAvatarAssets,
+    fetchMyProfile,
     fetchWorkspaceChannels,
+    fetchWorkspaceMembers,
     fetchWorkspaces,
     resolveAvatarsBatch,
+    uploadMyAvatar,
 } from '../api';
+import { getUserIdentity } from '../lib/auth';
 
 type AppShellState = {
     workspaces: WorkspaceDto[];
@@ -47,6 +57,12 @@ function initialsFromName(value: string) {
 function toAbsoluteAvatarUrl(contentUrl?: string | null): string | undefined {
     if (!contentUrl) return undefined;
     return contentUrl.startsWith('http') ? contentUrl : `${import.meta.env.VITE_API_BASE}${contentUrl}`;
+}
+
+function formatAvatarMeta(item: MyAvatarAssetDto): string {
+    const size = item.originalSizeBytes ? `${Math.round(item.originalSizeBytes / 1024)} KB` : 'size n/a';
+    const dims = item.width && item.height ? `${item.width}x${item.height}` : 'dims n/a';
+    return `${dims} • ${size}`;
 }
 
 export function useAppShell() {
@@ -86,6 +102,18 @@ export default function AppShellLayout() {
     const [inviteMaxUses, setInviteMaxUses] = useState('');
     const [inviteLink, setInviteLink] = useState<string | null>(null);
     const [inviteBusy, setInviteBusy] = useState(false);
+    const [workspaceUsers, setWorkspaceUsers] = useState<WorkspaceUserDto[]>([]);
+    const [loadingWorkspaceUsers, setLoadingWorkspaceUsers] = useState(false);
+    const [workspaceUserAvatarById, setWorkspaceUserAvatarById] = useState<Record<number, string>>({});
+    const [profileOpen, setProfileOpen] = useState(false);
+    const [profileLoading, setProfileLoading] = useState(false);
+    const [profileError, setProfileError] = useState<string | null>(null);
+    const [profile, setProfile] = useState<MyProfileDto | null>(null);
+    const [avatars, setAvatars] = useState<MyAvatarAssetDto[]>([]);
+    const [avatarBusy, setAvatarBusy] = useState(false);
+    const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
+    const avatarInputRef = useRef<HTMLInputElement | null>(null);
+    const profilePopupRef = useRef<HTMLDivElement | null>(null);
 
     const activeWorkspaceId = workspaceId ? Number(workspaceId) : undefined;
     const activeWorkspace = useMemo(
@@ -93,6 +121,23 @@ export default function AppShellLayout() {
         [workspaces, activeWorkspaceId],
     );
     const isDmMode = location.pathname.startsWith('/app/dm');
+    const myUserId = useMemo(() => {
+        const identity = getUserIdentity();
+        if (!identity) return null;
+        const parsed = Number(identity);
+        return Number.isFinite(parsed) ? parsed : null;
+    }, []);
+    const sortedWorkspaceUsers = useMemo(() => {
+        if (workspaceUsers.length === 0) return [];
+        if (!myUserId) return workspaceUsers;
+        const me = workspaceUsers.filter(user => user.id === myUserId);
+        const others = workspaceUsers.filter(user => user.id !== myUserId);
+        return [...me, ...others];
+    }, [workspaceUsers, myUserId]);
+    const workspaceUserIdsKey = useMemo(
+        () => workspaceUsers.map(user => user.id).sort((a, b) => a - b).join(','),
+        [workspaceUsers],
+    );
 
     const refreshWorkspaces = useCallback(async () => {
         setLoadingWorkspaces(true);
@@ -206,6 +251,80 @@ export default function AppShellLayout() {
         }
     };
 
+    async function loadProfileCard() {
+        setProfileLoading(true);
+        setProfileError(null);
+        try {
+            const [myProfile, avatarItems] = await Promise.all([
+                fetchMyProfile(),
+                fetchMyAvatarAssets(),
+            ]);
+            setProfile(myProfile);
+            setAvatars(avatarItems);
+            const active = avatarItems.find(item => item.activeGlobal);
+            const activeUrl = toAbsoluteAvatarUrl(active?.contentUrl);
+            if (activeUrl && myUserId) {
+                setWorkspaceUserAvatarById(prev => ({ ...prev, [myUserId]: activeUrl }));
+            }
+        } catch (e: any) {
+            setProfileError(e?.message || 'Failed to load profile');
+        } finally {
+            setProfileLoading(false);
+        }
+    }
+
+    async function onAvatarSelected(file?: File | null) {
+        if (!file) return;
+        setAvatarBusy(true);
+        setAvatarMessage(null);
+        try {
+            await uploadMyAvatar(file, 'GLOBAL');
+            await loadProfileCard();
+            if (myUserId) {
+                const items = await resolveAvatarsBatch([myUserId]);
+                const mine = items.find(x => x.userId === myUserId);
+                const mineUrl = toAbsoluteAvatarUrl(mine?.contentUrl);
+                if (mineUrl) {
+                    setWorkspaceUserAvatarById(prev => ({ ...prev, [myUserId]: mineUrl }));
+                }
+            }
+            setAvatarMessage('Avatar uploaded');
+        } catch (e: any) {
+            setAvatarMessage(e?.message || 'Failed to upload avatar');
+        } finally {
+            setAvatarBusy(false);
+            if (avatarInputRef.current) avatarInputRef.current.value = '';
+        }
+    }
+
+    async function onActivateAvatar(assetId: number) {
+        try {
+            setAvatarBusy(true);
+            setAvatarMessage(null);
+            const item = await activateMyAvatar(assetId);
+            const resolved = toAbsoluteAvatarUrl(item.contentUrl);
+            await loadProfileCard();
+            if (resolved && myUserId) {
+                setWorkspaceUserAvatarById(prev => ({ ...prev, [myUserId]: resolved }));
+            }
+            setAvatarMessage('Active avatar updated');
+        } catch (e: any) {
+            setAvatarMessage(e?.message || 'Failed to switch avatar');
+        } finally {
+            setAvatarBusy(false);
+        }
+    }
+
+    async function openDmWithUser(userId: number) {
+        if (!userId || (myUserId !== null && userId === myUserId)) return;
+        try {
+            await createDmChannel(userId);
+            navigate(`/app/dm/${userId}`);
+        } catch (e) {
+            console.warn('Failed to open DM', e);
+        }
+    }
+
     useEffect(() => {
         document.body.classList.add('app-shell-mode');
         return () => {
@@ -272,6 +391,92 @@ export default function AppShellLayout() {
             cancelled = true;
         };
     }, [activeWorkspaceId, channelId, navigate]);
+
+    useEffect(() => {
+        if (!myUserId) return;
+        const uid = myUserId;
+        resolveAvatarOnce();
+        async function resolveAvatarOnce() {
+            try {
+                const [item, myProfile] = await Promise.all([
+                    resolveAvatarsBatch([uid]),
+                    fetchMyProfile(),
+                ]);
+                const url = toAbsoluteAvatarUrl(item[0]?.contentUrl);
+                if (url) {
+                    setWorkspaceUserAvatarById(prev => ({ ...prev, [uid]: url }));
+                }
+                setProfile(myProfile);
+            } catch (e) {
+                console.warn('Failed to resolve my avatar', e);
+            }
+        }
+    }, [myUserId]);
+
+    useEffect(() => {
+        if (!activeWorkspaceId || isDmMode) {
+            setWorkspaceUsers([]);
+            setWorkspaceUserAvatarById({});
+            return;
+        }
+        let cancelled = false;
+        setLoadingWorkspaceUsers(true);
+        fetchWorkspaceMembers(activeWorkspaceId)
+            .then(items => {
+                if (cancelled) return;
+                setWorkspaceUsers(items);
+            })
+            .catch(e => {
+                if (!cancelled) console.warn('Failed to load workspace users', e);
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingWorkspaceUsers(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [activeWorkspaceId, isDmMode]);
+
+    useEffect(() => {
+        const ids = workspaceUserIdsKey
+            ? workspaceUserIdsKey.split(',').map(v => Number(v)).filter(v => Number.isFinite(v) && v > 0)
+            : [];
+        if (ids.length === 0) {
+            setWorkspaceUserAvatarById({});
+            return;
+        }
+        let cancelled = false;
+        resolveAvatarsBatch(ids)
+            .then(items => {
+                if (cancelled) return;
+                const next: Record<number, string> = {};
+                for (const item of items) {
+                    const url = toAbsoluteAvatarUrl(item.contentUrl);
+                    if (url) next[item.userId] = url;
+                }
+                setWorkspaceUserAvatarById(next);
+            })
+            .catch(e => {
+                if (!cancelled) console.warn('Failed to resolve workspace avatars', e);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [workspaceUserIdsKey]);
+
+    useEffect(() => {
+        if (!profileOpen) return;
+        const onPointerDown = (event: MouseEvent) => {
+            const target = event.target as Node | null;
+            if (!target) return;
+            if (profilePopupRef.current?.contains(target)) return;
+            setProfileOpen(false);
+        };
+        window.addEventListener('mousedown', onPointerDown);
+        return () => {
+            window.removeEventListener('mousedown', onPointerDown);
+        };
+    }, [profileOpen]);
 
     const value = useMemo(
         () => ({
@@ -456,15 +661,115 @@ export default function AppShellLayout() {
 
                 <aside className="rail info-rail">
                     <div className="info-card">
-                        <div className="info-title">Today</div>
-                        <div className="info-value">3 live rooms</div>
-                        <div className="info-sub">Stay in sync with the team.</div>
+                        <div className="info-title">Workspace users</div>
+                        {isDmMode ? (
+                            <div className="info-sub">Open a workspace channel to see members</div>
+                        ) : loadingWorkspaceUsers ? (
+                            <div className="info-sub">Loading users…</div>
+                        ) : sortedWorkspaceUsers.length === 0 ? (
+                            <div className="info-sub">No users in this workspace</div>
+                        ) : (
+                            <div className="workspace-users-list">
+                                {sortedWorkspaceUsers.map((user, index) => {
+                                    const isMe = myUserId !== null && user.id === myUserId;
+                                    const avatarUrl = workspaceUserAvatarById[user.id];
+                                    return (
+                                        <button
+                                            key={user.id}
+                                            type="button"
+                                            className={`workspace-user-item${isMe ? ' is-me' : ''}`}
+                                            onClick={() => {
+                                                if (isMe) {
+                                                    const next = !profileOpen;
+                                                    setProfileOpen(next);
+                                                    setAvatarMessage(null);
+                                                    if (next) void loadProfileCard();
+                                                    return;
+                                                }
+                                                void openDmWithUser(user.id);
+                                            }}
+                                        >
+                                            <span
+                                                className="workspace-user-avatar"
+                                                style={avatarUrl ? { backgroundImage: `url(${avatarUrl})` } : undefined}
+                                            >
+                                                {!avatarUrl ? initialsFromName(user.username) : null}
+                                            </span>
+                                            <span className="workspace-user-meta">
+                                                <span className="workspace-user-name">
+                                                    {isMe ? 'You' : user.username}
+                                                </span>
+                                                <span className="workspace-user-role">{user.role}</span>
+                                            </span>
+                                            {!isMe && <span className="workspace-user-action">DM</span>}
+                                            {isMe && index === 0 && <span className="workspace-user-action">Profile</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
-                    <div className="info-card muted">
-                        <div className="info-title">Shortcuts</div>
-                        <div className="info-sub">Shift + K to quick jump</div>
-                        <div className="info-sub">Cmd + / for command palette</div>
-                    </div>
+                    {profileOpen && (
+                        <div className="info-card profile-inline-popup" ref={profilePopupRef}>
+                            <div className="info-title">My profile</div>
+                            {profileLoading ? (
+                                <div className="info-sub">Loading…</div>
+                            ) : profileError ? (
+                                <div className="alert-banner">{profileError}</div>
+                            ) : (
+                                <>
+                                    <div className="info-sub">#{profile?.id} · {profile?.username} · {profile?.role}</div>
+                                    <div className="profile-upload-row">
+                                        <button
+                                            className="primary-btn"
+                                            type="button"
+                                            onClick={() => avatarInputRef.current?.click()}
+                                            disabled={avatarBusy}
+                                        >
+                                            {avatarBusy ? 'Uploading…' : 'Upload new'}
+                                        </button>
+                                        <input
+                                            ref={avatarInputRef}
+                                            type="file"
+                                            accept="image/png,image/jpeg"
+                                            style={{ display: 'none' }}
+                                            onChange={e => onAvatarSelected(e.target.files?.[0])}
+                                        />
+                                    </div>
+                                    {avatarMessage && <div className="info-sub">{avatarMessage}</div>}
+                                    <div className="profile-avatars-list">
+                                        {avatars.length === 0 ? (
+                                            <div className="info-sub">No uploaded avatars yet</div>
+                                        ) : (
+                                            avatars.map(item => {
+                                                const url = toAbsoluteAvatarUrl(item.contentUrl);
+                                                return (
+                                                    <div className="profile-avatar-item" key={item.assetId}>
+                                                        <div
+                                                            className="profile-avatar-thumb"
+                                                            style={url ? { backgroundImage: `url(${url})` } : undefined}
+                                                        />
+                                                        <div className="profile-avatar-info">
+                                                            <div className="profile-avatar-name">asset #{item.assetId}</div>
+                                                            <div className="profile-avatar-sub">{formatAvatarMeta(item)}</div>
+                                                        </div>
+                                                        <button
+                                                            className="ghost-btn"
+                                                            type="button"
+                                                            disabled={avatarBusy || item.activeGlobal}
+                                                            onClick={() => onActivateAvatar(item.assetId)}
+                                                        >
+                                                            {item.activeGlobal ? 'Active' : 'Activate'}
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </aside>
             </div>
             {workspaceModalOpen && (

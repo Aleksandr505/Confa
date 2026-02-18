@@ -12,6 +12,7 @@ import space.confa.api.infrastructure.db.repository.WorkspaceMemberRepository;
 import space.confa.api.infrastructure.db.repository.WorkspaceRepository;
 import space.confa.api.model.dto.request.CreateWorkspaceDto;
 import space.confa.api.model.dto.response.WorkspaceDto;
+import space.confa.api.model.dto.response.WorkspaceUserDto;
 import space.confa.api.model.entity.WorkspaceEntity;
 import space.confa.api.model.entity.WorkspaceMemberEntity;
 import space.confa.api.shared.mapper.MessengerMapper;
@@ -41,6 +42,31 @@ public class WorkspaceService {
                         row.get("created_at", java.time.Instant.class)
                 ))
                 .all();
+    }
+
+    public Flux<WorkspaceUserDto> getWorkspaceUsers(Long requesterUserId, Long workspaceId) {
+        return workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, requesterUserId)
+                .flatMapMany(isMember -> {
+                    if (!isMember) {
+                        return Flux.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "No access to workspace"));
+                    }
+                    return databaseClient.sql("""
+                                    SELECT u.id, u.username, u.role, wm.joined_at
+                                    FROM workspace_member wm
+                                    JOIN user u ON u.id = wm.user_id
+                                    WHERE wm.workspace_id = :workspaceId
+                                      AND u.blocked_at IS NULL
+                                    ORDER BY wm.joined_at ASC, u.id ASC
+                                    """)
+                            .bind("workspaceId", workspaceId)
+                            .map((row, metadata) -> new WorkspaceUserDto(
+                                    row.get("id", Long.class),
+                                    row.get("username", String.class),
+                                    row.get("role", space.confa.api.model.domain.UserRole.class),
+                                    row.get("joined_at", java.time.Instant.class)
+                            ))
+                            .all();
+                });
     }
 
     @Transactional

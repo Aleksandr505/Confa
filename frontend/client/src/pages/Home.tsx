@@ -47,6 +47,13 @@ export default function HomePage() {
         const parsed = Number(identity);
         return Number.isFinite(parsed) ? parsed : null;
     }, []);
+    const profileInitials = useMemo(() => {
+        const source = profile?.username || (myUserId ? `user ${myUserId}` : 'user');
+        const parts = source.trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return 'U';
+        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+        return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase() || 'U';
+    }, [profile?.username, myUserId]);
 
     useEffect(() => {
         document.body.classList.remove('app-shell-mode');
@@ -227,7 +234,7 @@ export default function HomePage() {
                 rel="noreferrer"
                 title="Open Messenger"
             >
-                ⦿
+                <img src="/chat_logo.png" alt="Messenger" className="switch-to-shell-logo" />
             </a>
             <button
                 className="profile-avatar-btn"
@@ -236,7 +243,7 @@ export default function HomePage() {
                 title="Профиль"
                 style={currentAvatarUrl ? { backgroundImage: `url(${currentAvatarUrl})` } : undefined}
             >
-                {!currentAvatarUrl ? '☺' : null}
+                {!currentAvatarUrl ? profileInitials : null}
             </button>
             {profileOpen && (
                 <div className="profile-popup" ref={profilePopupRef}>
@@ -252,7 +259,7 @@ export default function HomePage() {
                                 <div><strong>Логин:</strong> {profile?.username ?? '—'}</div>
                                 <div><strong>Роль:</strong> {profile?.role ?? '—'}</div>
                             </div>
-                            <div className="profile-upload-row">
+                            <div className="home-profile-upload-row">
                                 <button
                                     className="btn primary"
                                     type="button"
@@ -270,21 +277,21 @@ export default function HomePage() {
                                 />
                             </div>
                             {avatarMessage && <div className="alert">{avatarMessage}</div>}
-                            <div className="profile-avatars-list">
+                            <div className="home-profile-avatars-list">
                                 {avatars.length === 0 ? (
                                     <div className="profile-popup-empty">Загруженных аватарок пока нет</div>
                                 ) : (
                                     avatars.map(item => {
                                         const url = toAbsoluteAvatarUrl(item.contentUrl);
                                         return (
-                                            <div className="profile-avatar-item" key={item.assetId}>
+                                            <div className="home-profile-avatar-item" key={item.assetId}>
                                                 <div
-                                                    className="profile-avatar-thumb"
+                                                    className="home-profile-avatar-thumb"
                                                     style={url ? { backgroundImage: `url(${url})` } : undefined}
                                                 />
-                                                <div className="profile-avatar-info">
-                                                    <div className="profile-avatar-name">asset #{item.assetId}</div>
-                                                    <div className="profile-avatar-sub">
+                                                <div className="home-profile-avatar-info">
+                                                    <div className="home-profile-avatar-name">asset #{item.assetId}</div>
+                                                    <div className="home-profile-avatar-sub">
                                                         {formatAvatarMeta(item)}
                                                     </div>
                                                 </div>

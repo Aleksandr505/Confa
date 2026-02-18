@@ -9,6 +9,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import space.confa.api.model.dto.request.CreateWorkspaceDto;
 import space.confa.api.model.dto.response.WorkspaceDto;
+import space.confa.api.model.dto.response.WorkspaceUserDto;
 import space.confa.api.service.WorkspaceService;
 
 @RestController
@@ -29,6 +30,14 @@ public class WorkspaceController {
             @Valid @RequestBody CreateWorkspaceDto dto
     ) {
         return workspaceService.createWorkspace(getUserId(jwt), dto);
+    }
+
+    @GetMapping("/{workspaceId}/members")
+    public Flux<WorkspaceUserDto> getWorkspaceMembers(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long workspaceId
+    ) {
+        return workspaceService.getWorkspaceUsers(getUserId(jwt), workspaceId);
     }
 
     private long getUserId(Jwt jwt) {

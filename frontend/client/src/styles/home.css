@@ -11,17 +11,25 @@
     border-radius: 999px;
     display: grid;
     place-items: center;
+    padding: 0;
     text-decoration: none;
-    color: var(--client-fg);
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.45);
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.5);
-    font-size: 1rem;
+    overflow: hidden;
 }
 
 .switch-to-shell:hover {
-    border-color: var(--client-accent);
-    color: #fff;
+    border-color: #ffffff;
+    box-shadow: 0 14px 28px rgba(14, 165, 233, 0.4);
+    transform: translateY(-1px);
+}
+
+.switch-to-shell-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 .profile-avatar-btn {
@@ -86,29 +94,29 @@
     font-size: 0.9rem;
 }
 
-.profile-upload-row {
+.home-profile-upload-row {
     margin-top: 12px;
     margin-bottom: 10px;
 }
 
-.profile-avatars-list {
+.home-profile-avatars-list {
     display: grid;
     gap: 10px;
     margin-top: 10px;
 }
 
-.profile-avatar-item {
+.home-profile-avatar-item {
     display: grid;
     grid-template-columns: 48px 1fr auto;
     gap: 10px;
     align-items: center;
     padding: 8px;
     border-radius: 12px;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    background: rgba(30, 41, 59, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.78);
 }
 
-.profile-avatar-thumb {
+.home-profile-avatar-thumb {
     width: 48px;
     height: 48px;
     border-radius: 12px;
@@ -118,12 +126,12 @@
     background-repeat: no-repeat;
 }
 
-.profile-avatar-name {
+.home-profile-avatar-name {
     font-size: 0.88rem;
     font-weight: 600;
 }
 
-.profile-avatar-sub {
+.home-profile-avatar-sub {
     font-size: 0.78rem;
     color: rgba(226, 232, 240, 0.8);
 }
