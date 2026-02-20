@@ -61,6 +61,7 @@ import '../styles/livekit-theme.css';
 import { getUserIdentity, isAdmin } from '../lib/auth.ts';
 import { getAvatarColor, getAvatarUrl, setAvatarUrlOverride } from '../lib/avatar';
 import { ParticipantEvent, Track } from 'livekit-client';
+import Soundboard from '../components/Soundboard';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 
@@ -706,6 +707,7 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
                     <BrandedVideoConference
                         disableChat={hideChat || embedded}
                         avatarRefreshTick={avatarRefreshTick}
+                        roomName={resolvedRoomId}
                     />
                 </main>
 
@@ -1165,9 +1167,11 @@ function BrandedParticipantTile(props: ParticipantTileProps) {
 function BrandedVideoConference({
     disableChat,
     avatarRefreshTick,
+    roomName,
 }: {
     disableChat?: boolean;
     avatarRefreshTick: number;
+    roomName: string;
 }) {
     const [widgetState, setWidgetState] = useState<WidgetState>({
         showChat: false,
@@ -1331,6 +1335,10 @@ function BrandedVideoConference({
                             <DeafenIcon muted={isDeafened} />
                             <span>Audio off</span>
                         </button>
+                        <Soundboard
+                            roomName={roomName}
+                            triggerClassName="lk-button lk-soundboard-button"
+                        />
                     </div>
                 </div>
                 {screenShareError && (

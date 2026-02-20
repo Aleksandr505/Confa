@@ -10,6 +10,7 @@ import {
 import '@livekit/components-styles';
 import { Track } from 'livekit-client';
 import { fetchChannelLivekitToken } from '../api';
+import Soundboard from '../components/Soundboard';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 
@@ -100,6 +101,7 @@ export default function VoiceChannelView({ channelId, channelName }: VoiceChanne
                                 className="lk-control-bar--main"
                                 controls={{ chat: false, screenShare: true }}
                             />
+                            <Soundboard triggerClassName="lk-button lk-soundboard-button" />
                         </div>
                         <RoomAudioRenderer />
                     </LiveKitRoom>

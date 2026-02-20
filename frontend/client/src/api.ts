@@ -454,5 +454,77 @@ export async function disableRoomAgents(room: string): Promise<void> {
     });
 }
 
+export type SoundClipDto = {
+    id: number;
+    ownerUserId: number;
+    sourceRoomName: string;
+    sharedToCurrentRoom: boolean;
+    name: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMs?: number | null;
+    contentUrl: string;
+    createdAt?: string | null;
+};
+
+export async function uploadSoundClip(
+    file: File,
+    payload?: {
+        name?: string;
+        roomName?: string;
+    },
+): Promise<SoundClipDto> {
+    const params = new URLSearchParams();
+    if (payload?.name) params.set('name', payload.name);
+    if (payload?.roomName) params.set('roomName', payload.roomName);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const form = new FormData();
+    form.append('file', file);
+
+    return http<SoundClipDto>(`/api/sounds${suffix}`, {
+        method: 'POST',
+        body: form,
+    });
+}
+
+export async function fetchSoundClips(roomName: string): Promise<SoundClipDto[]> {
+    return http<SoundClipDto[]>(`/api/rooms/${encodeURIComponent(roomName)}/sounds`, {
+        method: 'GET',
+    });
+}
+
+export async function fetchAvailableSoundClips(roomName: string): Promise<SoundClipDto[]> {
+    return http<SoundClipDto[]>(`/api/rooms/${encodeURIComponent(roomName)}/sounds/available`, {
+        method: 'GET',
+    });
+}
+
+export async function deleteSoundClip(soundId: number): Promise<void> {
+    await http<void>(`/api/sounds/${soundId}`, {
+        method: 'DELETE',
+    });
+}
+
+export async function playSoundClip(soundId: number, roomName: string): Promise<void> {
+    await http<void>(`/api/sounds/${soundId}/play`, {
+        method: 'POST',
+        body: JSON.stringify({ roomName }),
+    });
+}
+
+export async function shareSoundClip(soundId: number, targetRoomName: string): Promise<void> {
+    await http<void>(`/api/sounds/${soundId}/share`, {
+        method: 'POST',
+        body: JSON.stringify({ targetRoomName }),
+    });
+}
+
+export async function unshareSoundClip(soundId: number, targetRoomName: string): Promise<void> {
+    await http<void>(`/api/sounds/${soundId}/share/${encodeURIComponent(targetRoomName)}`, {
+        method: 'DELETE',
+    });
+}
+
 
 loadTokensFromSession();
