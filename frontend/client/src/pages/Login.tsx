@@ -1,7 +1,6 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { login } from '../api';
-import '../styles/login.css';
 
 export default function LoginPage() {
     const [username, setU] = useState('');
@@ -11,6 +10,10 @@ export default function LoginPage() {
     const nav = useNavigate();
     const [searchParams] = useSearchParams();
     const inviteToken = searchParams.get('invite');
+
+    useEffect(() => {
+        document.body.classList.remove('app-shell-mode');
+    }, []);
 
     async function onSubmit(e: FormEvent) {
         e.preventDefault();

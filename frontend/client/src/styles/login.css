@@ -38,6 +38,7 @@
     color: var(--client-fg);
 }
 
+
 .auth-title {
     margin: 0 0 4px;
     font-size: 1.6rem;
@@ -153,6 +154,31 @@
     display: grid;
     gap: 10px;
     margin: 12px 0 6px;
+    max-height: min(44dvh, 420px);
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.room-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.room-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.room-list::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.28);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.room-list:hover::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.45);
+    background-clip: padding-box;
 }
 
 .room-row {

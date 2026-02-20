@@ -50,6 +50,14 @@ services:
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - CLIENT_BASE_URL=${CLIENT_BASE_URL}
+      - AVATAR_MAX_UPLOAD_BYTES=${AVATAR_MAX_UPLOAD_BYTES:-2097152}
+      - AVATAR_PRESIGN_TTL_SECONDS=${AVATAR_PRESIGN_TTL_SECONDS:-900}
+      - AVATAR_S3_ENDPOINT=${AVATAR_S3_ENDPOINT:-http://minio:9000}
+      - AVATAR_S3_REGION=${AVATAR_S3_REGION:-eu}
+      - AVATAR_S3_BUCKET=${AVATAR_S3_BUCKET:-confa-assets}
+      - AVATAR_S3_ACCESS_KEY=${AVATAR_S3_ACCESS_KEY:-minioadmin}
+      - AVATAR_S3_SECRET_KEY=${AVATAR_S3_SECRET_KEY:-minioadmin}
+      - AVATAR_S3_PATH_STYLE=${AVATAR_S3_PATH_STYLE:-true}
     expose:
       - "8080"
     networks: [shared_web]
@@ -60,6 +68,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      minio:
+        condition: service_started
 
   client:
     image: ${CLIENT_IMAGE}
@@ -111,6 +121,21 @@ services:
       timeout: 5s
       retries: 5
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${AVATAR_S3_ACCESS_KEY:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${AVATAR_S3_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    expose:
+      - "9000"
+      - "9001"
+    networks: [shared_web]
+    restart: unless-stopped
+
   liquibase-migrations:
     image: liquibase/liquibase:latest
     container_name: liquibase-migrations
@@ -132,11 +157,37 @@ services:
       - update
     restart: "no"
 
+  ots:
+    image: onetimesecret/onetimesecret:latest
+    env_file:
+      - .env
+    environment:
+      - RACK_ENV=production
+      - HOST=pass.confa.space
+      - SSL=true
+      - SECRET=${OTS_SECRET}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@ots-redis:6379/0
+      - AUTH_SIGNUP=false
+    depends_on:
+      - ots-redis
+    networks: [shared_web]
+    restart: unless-stopped
+
+  ots-redis:
+    image: redis:bookworm
+    command: [ "redis-server", "--requirepass", "${REDIS_PASSWORD}" ]
+    volumes:
+      - ots_redis_data:/data
+    networks: [shared_web]
+    restart: unless-stopped
+
 volumes:
   caddy_data:
   caddy_config:
   mysql_data:
   redis_data:
+  minio_data:
+  ots_redis_data:
 
 # Before start docker-compose create network:
 # docker network ls

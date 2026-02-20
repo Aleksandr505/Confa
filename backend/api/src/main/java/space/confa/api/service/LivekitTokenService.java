@@ -25,14 +25,18 @@ public class LivekitTokenService {
         long userId = Long.parseLong(userJwt.getSubject());
 
         return roomAccessService.checkUserCanJoin(userId, roomName)
-                .then(Mono.fromSupplier(() -> buildToken(userJwt, dto, roomName)));
+                .then(Mono.fromSupplier(() -> buildToken(userJwt, roomName, dto.displayName())));
     }
 
-    private LivekitTokenDto buildToken(Jwt userJwt, CreateLivekitTokenDto dto, String roomName) {
+    public LivekitTokenDto createTokenForRoom(Jwt userJwt, String roomName) {
+        return buildToken(userJwt, roomName, null);
+    }
+
+    private LivekitTokenDto buildToken(Jwt userJwt, String roomName, String displayName) {
         AccessToken token = new AccessToken(props.apiKey(), props.apiSecret());
 
-        if (dto.displayName() != null) {
-            token.setName(dto.displayName());
+        if (displayName != null) {
+            token.setName(displayName);
         }
         token.setIdentity(userJwt.getSubject());
         token.addGrants(

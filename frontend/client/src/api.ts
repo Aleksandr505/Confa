@@ -24,6 +24,299 @@ export async function fetchLivekitToken(room?: string, displayName?: string) {
     return data.token;
 }
 
+export async function fetchChannelLivekitToken(channelId: number): Promise<string> {
+    const data = await http<{ token: string }>(`/api/channels/${channelId}/livekit-token`, {
+        method: 'POST',
+    });
+    return data.token;
+}
+
+export type WorkspaceDto = {
+    id: number;
+    name: string;
+    slug: string;
+    ownerUserId: number;
+    createdAt: string;
+};
+
+export type WorkspaceUserDto = {
+    id: number;
+    username: string;
+    role: 'USER' | 'ADMIN';
+    joinedAt?: string | null;
+};
+
+export type ChannelType = 'TEXT' | 'VOICE' | 'DM';
+
+export type ChannelDto = {
+    id: number;
+    workspaceId: number | null;
+    type: ChannelType;
+    name: string | null;
+    topic: string | null;
+    isPrivate: boolean;
+    position: number;
+    createdByUserId: number;
+    createdAt: string;
+};
+
+export type MessageDto = {
+    id: number;
+    channelId: number;
+    senderUserId: number | null;
+    senderUsername?: string | null;
+    kind: 'USER' | 'SYSTEM' | 'BOT';
+    body: string;
+    replyToMessageId?: number | null;
+    replyToBody?: string | null;
+    replyToSenderUsername?: string | null;
+    reactions?: MessageReactionDto[];
+    createdAt: string;
+    editedAt?: string | null;
+    deletedAt?: string | null;
+};
+
+export type MessagePageDto = {
+    items: MessageDto[];
+    nextCursor?: number | null;
+};
+
+export type MessageReactionDto = {
+    emoji: string;
+    count: number;
+    reactedByMe: boolean;
+};
+
+export type AvatarScopeType = 'GLOBAL' | 'WORKSPACE' | 'ROOM';
+
+export type AvatarViewDto = {
+    userId: number;
+    assetId?: number | null;
+    scopeType?: AvatarScopeType | null;
+    contentUrl?: string | null;
+    updatedAt?: string | null;
+};
+
+export type MyProfileDto = {
+    id: number;
+    username: string;
+    role: 'USER' | 'ADMIN';
+    createdAt?: string | null;
+};
+
+export type MyAvatarAssetDto = {
+    assetId: number;
+    contentUrl?: string | null;
+    originalContentType?: string | null;
+    originalSizeBytes?: number | null;
+    width?: number | null;
+    height?: number | null;
+    createdAt?: string | null;
+    activeGlobal: boolean;
+};
+
+export type DmSummary = {
+    channelId: number;
+    peerUserId: number;
+    peerUsername: string;
+    lastMessageBody?: string | null;
+    lastMessageAt?: string | null;
+};
+
+export async function fetchWorkspaces(): Promise<WorkspaceDto[]> {
+    return http<WorkspaceDto[]>('/api/workspaces', { method: 'GET' });
+}
+
+export async function createWorkspace(payload: { name: string; slug: string }): Promise<WorkspaceDto> {
+    return http<WorkspaceDto>('/api/workspaces', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function fetchWorkspaceChannels(workspaceId: number): Promise<ChannelDto[]> {
+    return http<ChannelDto[]>(`/api/workspaces/${workspaceId}/channels`, { method: 'GET' });
+}
+
+export async function fetchWorkspaceMembers(workspaceId: number): Promise<WorkspaceUserDto[]> {
+    return http<WorkspaceUserDto[]>(`/api/workspaces/${workspaceId}/members`, { method: 'GET' });
+}
+
+export async function createWorkspaceChannel(
+    workspaceId: number,
+    payload: { type: ChannelType; name: string; topic?: string; isPrivate?: boolean; position?: number },
+): Promise<ChannelDto> {
+    return http<ChannelDto>(`/api/workspaces/${workspaceId}/channels`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
+export type WorkspaceInvite = {
+    token: string;
+    inviteUrl?: string | null;
+    workspaceId: number;
+    workspaceName: string;
+    expiresAt?: string | null;
+    maxUses?: number | null;
+    usedCount?: number | null;
+};
+
+export async function createWorkspaceInvite(
+    workspaceId: number,
+    payload?: { ttlSeconds?: number; maxUses?: number },
+): Promise<WorkspaceInvite> {
+    return http<WorkspaceInvite>(`/api/workspaces/${workspaceId}/invites`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+    });
+}
+
+export async function acceptWorkspaceInvite(token: string): Promise<WorkspaceDto> {
+    return http<WorkspaceDto>('/api/workspaces/invites/accept', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+    });
+}
+
+export async function createDmChannel(peerId: number): Promise<ChannelDto> {
+    return http<ChannelDto>(`/api/dm/${peerId}`, {
+        method: 'POST',
+    });
+}
+
+export async function fetchChannelMessages(
+    channelId: number,
+    cursor?: number,
+    limit?: number,
+): Promise<MessagePageDto> {
+    const params = new URLSearchParams();
+    if (cursor) params.set('cursor', String(cursor));
+    if (limit) params.set('limit', String(limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return http<MessagePageDto>(`/api/channels/${channelId}/messages${suffix}`, { method: 'GET' });
+}
+
+export async function createChannelMessage(
+    channelId: number,
+    body: string,
+    replyToMessageId?: number | null,
+): Promise<MessageDto> {
+    return http<MessageDto>(`/api/channels/${channelId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ body, replyToMessageId: replyToMessageId ?? null }),
+    });
+}
+
+export async function fetchDmList(): Promise<DmSummary[]> {
+    return http<DmSummary[]>('/api/dms', { method: 'GET' });
+}
+
+export async function fetchDmMessages(
+    peerId: number,
+    cursor?: number,
+    limit?: number,
+): Promise<MessagePageDto> {
+    const params = new URLSearchParams();
+    if (cursor) params.set('cursor', String(cursor));
+    if (limit) params.set('limit', String(limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return http<MessagePageDto>(`/api/dm/${peerId}/messages${suffix}`, { method: 'GET' });
+}
+
+export async function createDmMessage(
+    peerId: number,
+    body: string,
+    replyToMessageId?: number | null,
+): Promise<MessageDto> {
+    return http<MessageDto>(`/api/dm/${peerId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ body, replyToMessageId: replyToMessageId ?? null }),
+    });
+}
+
+export async function addMessageReaction(messageId: number, emoji: string): Promise<MessageReactionDto[]> {
+    return http<MessageReactionDto[]>(`/api/messages/${messageId}/reactions`, {
+        method: 'POST',
+        body: JSON.stringify({ emoji }),
+    });
+}
+
+export async function removeMessageReaction(messageId: number, emoji: string): Promise<MessageReactionDto[]> {
+    return http<MessageReactionDto[]>(
+        `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
+        { method: 'DELETE' },
+    );
+}
+
+export async function uploadMyAvatar(
+    file: File,
+    scopeType: AvatarScopeType = 'GLOBAL',
+    workspaceId?: number,
+    roomName?: string,
+): Promise<AvatarViewDto> {
+    const params = new URLSearchParams();
+    params.set('scopeType', scopeType);
+    if (workspaceId) params.set('workspaceId', String(workspaceId));
+    if (roomName) params.set('roomName', roomName);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const form = new FormData();
+    form.append('file', file);
+
+    return http<AvatarViewDto>(`/api/avatars/me${suffix}`, {
+        method: 'PUT',
+        body: form,
+    });
+}
+
+export async function resolveAvatar(userId: number, workspaceId?: number, roomName?: string): Promise<AvatarViewDto> {
+    const params = new URLSearchParams();
+    params.set('userId', String(userId));
+    if (workspaceId) params.set('workspaceId', String(workspaceId));
+    if (roomName) params.set('roomName', roomName);
+    return http<AvatarViewDto>(`/api/avatars/resolve?${params.toString()}`, {
+        method: 'GET',
+    });
+}
+
+export async function resolveAvatarsBatch(
+    userIds: number[],
+    workspaceId?: number,
+    roomName?: string,
+): Promise<AvatarViewDto[]> {
+    return http<AvatarViewDto[]>('/api/avatars/resolve-batch', {
+        method: 'POST',
+        body: JSON.stringify({
+            userIds,
+            workspaceId,
+            roomName,
+        }),
+    });
+}
+
+export async function fetchMyProfile(): Promise<MyProfileDto> {
+    return http<MyProfileDto>('/api/users/me', {
+        method: 'GET',
+    });
+}
+
+export async function fetchMyAvatarAssets(): Promise<MyAvatarAssetDto[]> {
+    return http<MyAvatarAssetDto[]>('/api/avatars/me/assets', {
+        method: 'GET',
+    });
+}
+
+export async function activateMyAvatar(assetId: number): Promise<AvatarViewDto> {
+    return http<AvatarViewDto>('/api/avatars/me/activate', {
+        method: 'POST',
+        body: JSON.stringify({
+            assetId,
+            scopeType: 'GLOBAL',
+        }),
+    });
+}
+
 export type RoomAccess = {
     id: number;
     name: string;
@@ -158,6 +451,78 @@ export async function enableRoomAgents(room: string): Promise<void> {
 export async function disableRoomAgents(room: string): Promise<void> {
     await http<void>(`/rooms/${encodeURIComponent(room)}/agents/disable`, {
         method: 'POST',
+    });
+}
+
+export type SoundClipDto = {
+    id: number;
+    ownerUserId: number;
+    sourceRoomName: string;
+    sharedToCurrentRoom: boolean;
+    name: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMs?: number | null;
+    contentUrl: string;
+    createdAt?: string | null;
+};
+
+export async function uploadSoundClip(
+    file: File,
+    payload?: {
+        name?: string;
+        roomName?: string;
+    },
+): Promise<SoundClipDto> {
+    const params = new URLSearchParams();
+    if (payload?.name) params.set('name', payload.name);
+    if (payload?.roomName) params.set('roomName', payload.roomName);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const form = new FormData();
+    form.append('file', file);
+
+    return http<SoundClipDto>(`/api/sounds${suffix}`, {
+        method: 'POST',
+        body: form,
+    });
+}
+
+export async function fetchSoundClips(roomName: string): Promise<SoundClipDto[]> {
+    return http<SoundClipDto[]>(`/api/rooms/${encodeURIComponent(roomName)}/sounds`, {
+        method: 'GET',
+    });
+}
+
+export async function fetchAvailableSoundClips(roomName: string): Promise<SoundClipDto[]> {
+    return http<SoundClipDto[]>(`/api/rooms/${encodeURIComponent(roomName)}/sounds/available`, {
+        method: 'GET',
+    });
+}
+
+export async function deleteSoundClip(soundId: number): Promise<void> {
+    await http<void>(`/api/sounds/${soundId}`, {
+        method: 'DELETE',
+    });
+}
+
+export async function playSoundClip(soundId: number, roomName: string): Promise<void> {
+    await http<void>(`/api/sounds/${soundId}/play`, {
+        method: 'POST',
+        body: JSON.stringify({ roomName }),
+    });
+}
+
+export async function shareSoundClip(soundId: number, targetRoomName: string): Promise<void> {
+    await http<void>(`/api/sounds/${soundId}/share`, {
+        method: 'POST',
+        body: JSON.stringify({ targetRoomName }),
+    });
+}
+
+export async function unshareSoundClip(soundId: number, targetRoomName: string): Promise<void> {
+    await http<void>(`/api/sounds/${soundId}/share/${encodeURIComponent(targetRoomName)}`, {
+        method: 'DELETE',
     });
 }
 

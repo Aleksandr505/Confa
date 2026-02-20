@@ -6,6 +6,8 @@ function hashString(input: string) {
     return Math.abs(hash);
 }
 
+const avatarOverrideByIdentity = new Map<string, string>();
+
 export function getAvatarColor(identity: string) {
     const hash = hashString(identity || 'anon');
     const hue = (hash % 12) * 30;
@@ -15,6 +17,9 @@ export function getAvatarColor(identity: string) {
 }
 
 export function getAvatarUrl(identity: string, name?: string) {
+    const overridden = avatarOverrideByIdentity.get(identity);
+    if (overridden) return overridden;
+
     const color = getAvatarColor(identity);
     const letter = (name || identity || '?').trim().slice(0, 1).toUpperCase() || '?';
 
@@ -27,4 +32,13 @@ export function getAvatarUrl(identity: string, name?: string) {
         return `data:image/svg+xml;base64,${btoa(utf8)}`;
     }
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+export function setAvatarUrlOverride(identity: string, avatarUrl?: string | null) {
+    if (!identity) return;
+    if (avatarUrl && avatarUrl.trim().length > 0) {
+        avatarOverrideByIdentity.set(identity, avatarUrl);
+        return;
+    }
+    avatarOverrideByIdentity.delete(identity);
 }

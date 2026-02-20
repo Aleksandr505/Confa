@@ -48,3 +48,28 @@ example.com {
 live.example.com {
         reverse_proxy livekit:7880
 }
+
+pass.example.com {
+    encode gzip
+    reverse_proxy ots:3000
+}
+
+# MinIO S3 API (public for presigned asset URLs)
+s3.example.com {
+    encode gzip
+    reverse_proxy minio:9000
+}
+
+# MinIO Console (restricted like admin panel)
+minio-admin.example.com {
+    @allowedIps remote_ip 95.45.13.52/32
+
+    handle @allowedIps {
+        encode gzip
+        reverse_proxy minio:9001
+    }
+
+    handle {
+        respond "Forbidden" 403
+    }
+}

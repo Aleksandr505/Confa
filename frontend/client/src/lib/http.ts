@@ -5,7 +5,8 @@ import { getAccessToken, setTokens, clearTokens } from './auth';
 function buildHeaders(init?: RequestInit): Headers {
     const h = new Headers(init?.headers);
 
-    if (!h.has('Content-Type')) h.set('Content-Type', 'application/json');
+    const isFormDataBody = typeof FormData !== 'undefined' && init?.body instanceof FormData;
+    if (!isFormDataBody && !h.has('Content-Type')) h.set('Content-Type', 'application/json');
 
     const token = getAccessToken();
     if (token) {

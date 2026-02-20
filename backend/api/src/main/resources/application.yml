@@ -43,3 +43,14 @@ livekit:
 
 app:
   client-base-url: ${CLIENT_BASE_URL:http://localhost:5173}
+
+avatar:
+  max-upload-bytes: ${AVATAR_MAX_UPLOAD_BYTES:2097152}
+  presign-ttl-seconds: ${AVATAR_PRESIGN_TTL_SECONDS:900}
+  storage:
+    endpoint: ${AVATAR_S3_ENDPOINT:http://localhost:9000}
+    region: ${AVATAR_S3_REGION:eu}
+    bucket: ${AVATAR_S3_BUCKET:confa-assets}
+    access-key: ${AVATAR_S3_ACCESS_KEY:minioadmin}
+    secret-key: ${AVATAR_S3_SECRET_KEY:minioadmin}
+    path-style: ${AVATAR_S3_PATH_STYLE:true}
