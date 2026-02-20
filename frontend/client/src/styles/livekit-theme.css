@@ -707,26 +707,6 @@
     background: rgba(15, 23, 42, 0.68);
 }
 
-.soundboard__emojis {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 4px;
-    margin-bottom: 8px;
-}
-
-.soundboard__emoji-btn {
-    border: 0;
-    border-radius: 999px;
-    height: 26px;
-    background: rgba(11, 20, 37, 0.92);
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.soundboard__emoji-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
 
 .soundboard__name {
     font-weight: 700;
@@ -756,34 +736,4 @@
     background: rgba(10, 16, 29, 0.92);
     color: #e2e8f0;
     padding: 6px 8px;
-}
-
-.room-reactions__overlay {
-    position: fixed;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    z-index: 18;
-}
-
-.room-reactions__fly {
-    position: absolute;
-    right: 24px;
-    bottom: 124px;
-    font-size: 26px;
-    animation: room-reaction-float 2200ms ease-out forwards;
-}
-
-@keyframes room-reaction-float {
-    0% {
-        transform: translateY(0) scale(0.9);
-        opacity: 0;
-    }
-    10% {
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(-180px) translateX(-36px) scale(1.15);
-        opacity: 0;
-    }
 }

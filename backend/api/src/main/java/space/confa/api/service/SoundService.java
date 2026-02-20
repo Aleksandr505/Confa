@@ -94,7 +94,7 @@ public class SoundService {
     public Flux<SoundClipDto> listForRoom(Long userId, String roomName) {
         return resolveMemberRoom(userId, roomName)
                 .flatMapMany(room -> querySoundsForRoom(room.getId())
-                        .flatMap(raw -> toDto(
+                        .flatMapSequential(raw -> toDto(
                                 raw.sound(),
                                 raw.shared()
                         )));
@@ -103,7 +103,7 @@ public class SoundService {
     public Flux<SoundClipDto> listAvailableForRoom(Long userId, String roomName) {
         return resolveMemberRoom(userId, roomName)
                 .flatMapMany(room -> queryAvailableSoundsForRoom(userId, room.getId())
-                        .flatMap(sound -> toDto(sound, false)));
+                        .flatMapSequential(sound -> toDto(sound, false)));
     }
 
     public Mono<Void> share(Long userId, Long soundId, String targetRoomName) {
@@ -173,9 +173,6 @@ public class SoundService {
                 .flatMap(sound -> {
                     if (sound.getDeletedAt() != null) {
                         return Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Sound not found"));
-                    }
-                    if (!userId.equals(sound.getOwnerUserId())) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "No access to sound"));
                     }
                     sound.setDeletedAt(Instant.now());
                     return soundClipRepository.save(sound)

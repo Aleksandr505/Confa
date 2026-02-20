@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { RoomEvent } from 'livekit-client';
 import {
+    deleteSoundClip,
     fetchAvailableSoundClips,
     fetchSoundClips,
     playSoundClip,
@@ -9,18 +10,11 @@ import {
     uploadSoundClip,
     type SoundClipDto,
 } from '../api';
+import { isAdmin } from '../lib/auth';
 
 type Props = {
     roomName?: string;
     triggerClassName?: string;
-};
-
-type EmojiPayload = {
-    v: 1;
-    type: 'emoji';
-    emoji: string;
-    from?: string;
-    ts: number;
 };
 
 type SoundPayload = {
@@ -33,18 +27,7 @@ type SoundPayload = {
     ts: number;
 };
 
-type FlyingReaction = {
-    id: string;
-    emoji: string;
-};
-
 type SoundboardTab = 'room' | 'available';
-
-const QUICK_EMOJIS = ['👍', '🔥', '😂', '👏', '❤️', '🎉'] as const;
-const MAX_FLYING_REACTIONS = 24;
-const SEND_COOLDOWN_MS = 700;
-const FLYING_REACTION_LIFETIME_MS = 2200;
-const SOUND_ENABLED_KEY = 'confa:roomReactionSoundEnabled';
 
 export default function Soundboard({ roomName, triggerClassName }: Props) {
     const room = useRoomContext();
@@ -55,26 +38,10 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
     const [tab, setTab] = useState<SoundboardTab>('room');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [flying, setFlying] = useState<FlyingReaction[]>([]);
-    const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
-        try {
-            return localStorage.getItem(SOUND_ENABLED_KEY) !== '0';
-        } catch {
-            return true;
-        }
-    });
-    const audioCtxRef = useRef<AudioContext | null>(null);
+    const [deleteMode, setDeleteMode] = useState(false);
     const incomingAudioRef = useRef<HTMLAudioElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const lastSentAtRef = useRef(0);
-
-    useEffect(() => {
-        try {
-            localStorage.setItem(SOUND_ENABLED_KEY, soundEnabled ? '1' : '0');
-        } catch {
-            // noop
-        }
-    }, [soundEnabled]);
+    const isAdminUser = isAdmin();
 
     useEffect(() => {
         if (!open || !resolvedRoomName) return;
@@ -85,12 +52,7 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
         const onDataReceived = (payload: Uint8Array) => {
             const parsed = safeParse(payload);
             if (!parsed) return;
-            if (parsed.type === 'emoji') {
-                enqueueReaction(parsed.emoji);
-                if (soundEnabled) playReactionTone(parsed.emoji);
-                return;
-            }
-            if (parsed.type === 'sound.play') {
+            if (parsed.type === 'sound.play' && parsed.url) {
                 playIncomingSound(parsed.url);
             }
         };
@@ -98,18 +60,7 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
         return () => {
             room.off(RoomEvent.DataReceived, onDataReceived);
         };
-    }, [room, soundEnabled]);
-
-    useEffect(() => {
-        return () => {
-            audioCtxRef.current?.close().catch(() => {});
-        };
-    }, []);
-
-    const canSendEmoji = useMemo(
-        () => Date.now() - lastSentAtRef.current >= SEND_COOLDOWN_MS,
-        [flying.length],
-    );
+    }, [room]);
 
     async function refresh() {
         if (!resolvedRoomName) return;
@@ -126,42 +77,6 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
             setError(e?.message || 'Не удалось загрузить soundboard');
         } finally {
             setLoading(false);
-        }
-    }
-
-    function enqueueReaction(emoji: string) {
-        const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        setFlying(prev => {
-            const next = [...prev, { id, emoji }];
-            return next.length > MAX_FLYING_REACTIONS
-                ? next.slice(next.length - MAX_FLYING_REACTIONS)
-                : next;
-        });
-        window.setTimeout(() => {
-            setFlying(prev => prev.filter(item => item.id !== id));
-        }, FLYING_REACTION_LIFETIME_MS);
-    }
-
-    async function sendEmoji(emoji: string) {
-        const now = Date.now();
-        if (now - lastSentAtRef.current < SEND_COOLDOWN_MS) return;
-        lastSentAtRef.current = now;
-        const payload: EmojiPayload = {
-            v: 1,
-            type: 'emoji',
-            emoji,
-            from: room.localParticipant.identity,
-            ts: now,
-        };
-        try {
-            await room.localParticipant.publishData(
-                new TextEncoder().encode(JSON.stringify(payload)),
-                { reliable: false },
-            );
-            enqueueReaction(emoji);
-            if (soundEnabled) playReactionTone(emoji);
-        } catch (e) {
-            console.warn('Failed to send room reaction', e);
         }
     }
 
@@ -198,6 +113,15 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
         }
     }
 
+    async function deleteClip(clip: SoundClipDto) {
+        try {
+            await deleteSoundClip(clip.id);
+            await refresh();
+        } catch (e: any) {
+            setError(e?.message || 'Не удалось удалить звук');
+        }
+    }
+
     function playIncomingSound(url: string) {
         const resolved = url.startsWith('http') ? url : `${import.meta.env.VITE_API_BASE}${url}`;
         const audio = incomingAudioRef.current ?? new Audio();
@@ -205,24 +129,6 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
         audio.src = resolved;
         audio.volume = 0.95;
         void audio.play().catch(() => {});
-    }
-
-    function playReactionTone(emoji: string) {
-        const ctx = audioCtxRef.current ?? new AudioContext();
-        audioCtxRef.current = ctx;
-        void ctx.resume();
-        const start = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(frequencyForEmoji(emoji), start);
-        gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(0.06, start + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(start);
-        osc.stop(start + 0.18);
     }
 
     return (
@@ -252,13 +158,15 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
                             <button className="btn ghost small" type="button" onClick={() => void refresh()}>
                                 Обновить
                             </button>
-                            <button
-                                className="btn ghost small"
-                                type="button"
-                                onClick={() => setSoundEnabled(v => !v)}
-                            >
-                                {soundEnabled ? 'Звук эмодзи: On' : 'Звук эмодзи: Off'}
-                            </button>
+                            {isAdminUser && (
+                                <button
+                                    className={`btn ghost small${deleteMode ? ' filter-active' : ''}`}
+                                    type="button"
+                                    onClick={() => setDeleteMode(v => !v)}
+                                >
+                                    {deleteMode ? 'Скрыть удаление' : 'Режим удаления'}
+                                </button>
+                            )}
                         </div>
                     </div>
                     <div className="soundboard__tabs">
@@ -289,24 +197,11 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
                         <div className="soundboard__grid">
                             {(tab === 'room' ? roomClips : availableClips).map(clip => (
                                 <div className="soundboard__item" key={clip.id}>
-                                    <div className="soundboard__emojis">
-                                        {QUICK_EMOJIS.map(emoji => (
-                                            <button
-                                                key={`${clip.id}-${emoji}`}
-                                                type="button"
-                                                className="soundboard__emoji-btn"
-                                                disabled={!canSendEmoji}
-                                                onClick={() => void sendEmoji(emoji)}
-                                            >
-                                                {emoji}
-                                            </button>
-                                        ))}
-                                    </div>
                                     <div className="soundboard__name" title={clip.name}>
                                         {clip.name}
                                     </div>
                                     <div className="soundboard__meta">
-                                        {clip.sourceRoomName}
+                                        ID: {clip.id} · {clip.sourceRoomName}
                                         {clip.sharedToCurrentRoom ? ' · shared' : ''}
                                     </div>
                                     <div className="soundboard__row">
@@ -326,6 +221,15 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
                                                 Поделиться в эту комнату
                                             </button>
                                         )}
+                                        {isAdminUser && deleteMode && (
+                                            <button
+                                                className="btn ghost small"
+                                                type="button"
+                                                onClick={() => void deleteClip(clip)}
+                                            >
+                                                Удалить
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -333,23 +237,14 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
                     )}
                 </div>
             )}
-
-            <div className="room-reactions__overlay" aria-hidden>
-                {flying.map(item => (
-                    <span className="room-reactions__fly" key={item.id}>
-                        {item.emoji}
-                    </span>
-                ))}
-            </div>
         </div>
     );
 }
 
-function safeParse(payload: Uint8Array): EmojiPayload | SoundPayload | null {
+function safeParse(payload: Uint8Array): SoundPayload | null {
     try {
         const text = new TextDecoder().decode(payload);
-        const data = JSON.parse(text) as EmojiPayload | SoundPayload;
-        if (data && data.v === 1 && data.type === 'emoji' && 'emoji' in data) return data;
+        const data = JSON.parse(text) as SoundPayload;
         if (data && data.v === 1 && data.type === 'sound.play' && 'url' in data) return data;
         return null;
     } catch {
@@ -357,29 +252,20 @@ function safeParse(payload: Uint8Array): EmojiPayload | SoundPayload | null {
     }
 }
 
-function frequencyForEmoji(emoji: string): number {
-    switch (emoji) {
-        case '🔥':
-            return 760;
-        case '😂':
-            return 680;
-        case '❤️':
-            return 520;
-        case '🎉':
-            return 920;
-        case '👏':
-            return 840;
-        default:
-            return 600;
-    }
-}
-
 function normalizeClips(payload: unknown): SoundClipDto[] {
+    const sortByNewest = (items: SoundClipDto[]) =>
+        items.slice().sort((a, b) => {
+            const at = a.createdAt ? Date.parse(a.createdAt) : 0;
+            const bt = b.createdAt ? Date.parse(b.createdAt) : 0;
+            if (at !== bt) return bt - at;
+            return b.id - a.id;
+        });
+
     if (Array.isArray(payload)) {
-        return payload as SoundClipDto[];
+        return sortByNewest(payload as SoundClipDto[]);
     }
     if (payload && typeof payload === 'object' && Array.isArray((payload as any).items)) {
-        return (payload as any).items as SoundClipDto[];
+        return sortByNewest((payload as any).items as SoundClipDto[]);
     }
     return [];
 }
