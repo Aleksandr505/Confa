@@ -62,6 +62,19 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
         };
     }, [room]);
 
+    useEffect(() => {
+        if (!open) return;
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setOpen(false);
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => {
+            window.removeEventListener('keydown', onKeyDown);
+        };
+    }, [open]);
+
     async function refresh() {
         if (!resolvedRoomName) return;
         setLoading(true);
@@ -138,103 +151,116 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
                 className={triggerClassName || 'lk-button lk-soundboard-button'}
                 onClick={() => setOpen(v => !v)}
             >
-                <span>Soundboard</span>
+                <span>🥁 Soundboard</span>
             </button>
 
             {open && (
-                <div className="soundboard__panel">
-                    <div className="soundboard__header">
-                        <strong>Soundboard · {resolvedRoomName}</strong>
-                        <div className="soundboard__header-actions">
-                            <label className="soundboard__upload">
-                                Upload
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="audio/mpeg,audio/ogg,audio/wav,audio/webm,audio/mp3"
-                                    onChange={e => void uploadFile(e.target.files?.[0])}
-                                />
-                            </label>
-                            <button className="btn ghost small" type="button" onClick={() => void refresh()}>
-                                Обновить
-                            </button>
-                            {isAdminUser && (
-                                <button
-                                    className={`btn ghost small${deleteMode ? ' filter-active' : ''}`}
-                                    type="button"
-                                    onClick={() => setDeleteMode(v => !v)}
-                                >
-                                    {deleteMode ? 'Скрыть удаление' : 'Режим удаления'}
+                <div className="soundboard__backdrop" onClick={() => setOpen(false)}>
+                    <div
+                        className="soundboard__panel"
+                        onClick={event => event.stopPropagation()}
+                    >
+                        <div className="soundboard__header">
+                            <strong className="soundboard__title">🥁 Soundboard · {resolvedRoomName}</strong>
+                            <div className="soundboard__header-actions">
+                                <label className="soundboard__upload">
+                                    Upload
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="audio/mpeg,audio/ogg,audio/wav,audio/webm,audio/mp3"
+                                        onChange={e => void uploadFile(e.target.files?.[0])}
+                                    />
+                                </label>
+                                <button className="btn ghost small" type="button" onClick={() => void refresh()}>
+                                    Обновить
                                 </button>
-                            )}
+                                {isAdminUser && (
+                                    <button
+                                        className={`btn ghost small${deleteMode ? ' filter-active' : ''}`}
+                                        type="button"
+                                        onClick={() => setDeleteMode(v => !v)}
+                                    >
+                                        {deleteMode ? 'Скрыть удаление' : 'Режим удаления'}
+                                    </button>
+                                )}
+                                <button
+                                    className="btn ghost small"
+                                    type="button"
+                                    onClick={() => setOpen(false)}
+                                    aria-label="Закрыть soundboard"
+                                >
+                                    Закрыть
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    <div className="soundboard__tabs">
-                        <button
-                            type="button"
-                            className={`soundboard__tab${tab === 'room' ? ' is-active' : ''}`}
-                            onClick={() => setTab('room')}
-                        >
-                            В комнате ({roomClips.length})
-                        </button>
-                        <button
-                            type="button"
-                            className={`soundboard__tab${tab === 'available' ? ' is-active' : ''}`}
-                            onClick={() => setTab('available')}
-                        >
-                            Доступные ({availableClips.length})
-                        </button>
-                    </div>
+                        <div className="soundboard__tabs">
+                            <button
+                                type="button"
+                                className={`soundboard__tab${tab === 'room' ? ' is-active' : ''}`}
+                                onClick={() => setTab('room')}
+                            >
+                                В комнате ({roomClips.length})
+                            </button>
+                            <button
+                                type="button"
+                                className={`soundboard__tab${tab === 'available' ? ' is-active' : ''}`}
+                                onClick={() => setTab('available')}
+                            >
+                                Доступные ({availableClips.length})
+                            </button>
+                        </div>
 
-                    {error && <div className="soundboard__error">{error}</div>}
-                    {loading ? (
-                        <div className="soundboard__empty">Загрузка…</div>
-                    ) : tab === 'room' && roomClips.length === 0 ? (
-                        <div className="soundboard__empty">Пока нет звуков для этой комнаты.</div>
-                    ) : tab === 'available' && availableClips.length === 0 ? (
-                        <div className="soundboard__empty">Нет доступных звуков из других комнат.</div>
-                    ) : (
-                        <div className="soundboard__grid">
-                            {(tab === 'room' ? roomClips : availableClips).map(clip => (
-                                <div className="soundboard__item" key={clip.id}>
-                                    <div className="soundboard__name" title={clip.name}>
-                                        {clip.name}
-                                    </div>
-                                    <div className="soundboard__meta">
-                                        ID: {clip.id} · {clip.sourceRoomName}
-                                        {clip.sharedToCurrentRoom ? ' · shared' : ''}
-                                    </div>
-                                    <div className="soundboard__row">
-                                        <button
-                                            className="btn small"
-                                            type="button"
-                                            onClick={() => void playClip(clip)}
-                                        >
-                                            Play
-                                        </button>
-                                        {tab === 'available' && (
+                        {error && <div className="soundboard__error">{error}</div>}
+                        {loading ? (
+                            <div className="soundboard__empty">Загрузка…</div>
+                        ) : tab === 'room' && roomClips.length === 0 ? (
+                            <div className="soundboard__empty">Пока нет звуков для этой комнаты.</div>
+                        ) : tab === 'available' && availableClips.length === 0 ? (
+                            <div className="soundboard__empty">Нет доступных звуков из других комнат.</div>
+                        ) : (
+                            <div className="soundboard__grid">
+                                {(tab === 'room' ? roomClips : availableClips).map(clip => (
+                                    <div className="soundboard__item" key={clip.id}>
+                                        <div className="soundboard__name" title={clip.name}>
+                                            {clip.name}
+                                        </div>
+                                        <div className="soundboard__meta">
+                                            ID: {clip.id} · {clip.sourceRoomName}
+                                            {clip.sharedToCurrentRoom ? ' · shared' : ''}
+                                        </div>
+                                        <div className="soundboard__row">
                                             <button
-                                                className="btn ghost small"
+                                                className="btn small"
                                                 type="button"
-                                                onClick={() => void shareClipToCurrentRoom(clip)}
+                                                onClick={() => void playClip(clip)}
                                             >
-                                                Поделиться в эту комнату
+                                                Play
                                             </button>
-                                        )}
-                                        {isAdminUser && deleteMode && (
-                                            <button
-                                                className="btn ghost small"
-                                                type="button"
-                                                onClick={() => void deleteClip(clip)}
-                                            >
-                                                Удалить
-                                            </button>
-                                        )}
+                                            {tab === 'available' && (
+                                                <button
+                                                    className="btn ghost small"
+                                                    type="button"
+                                                    onClick={() => void shareClipToCurrentRoom(clip)}
+                                                >
+                                                    Поделиться в эту комнату
+                                                </button>
+                                            )}
+                                            {isAdminUser && deleteMode && (
+                                                <button
+                                                    className="btn ghost small"
+                                                    type="button"
+                                                    onClick={() => void deleteClip(clip)}
+                                                >
+                                                    Удалить
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

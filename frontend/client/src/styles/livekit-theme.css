@@ -608,21 +608,34 @@
 
 .lk-soundboard-button {
     min-width: 112px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.soundboard__backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.38);
+    backdrop-filter: blur(2px);
+    z-index: 24;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 12px;
 }
 
 .soundboard__panel {
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 92px;
+    position: relative;
+    bottom: 80px;
     width: min(920px, calc(100vw - 20px));
     max-height: min(56vh, 460px);
     overflow: auto;
-    padding: 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(148, 163, 184, 0.35);
-    background: rgba(9, 14, 25, 0.96);
-    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.32);
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background:
+        linear-gradient(180deg, rgba(16, 24, 39, 0.98), rgba(9, 14, 25, 0.98));
+    box-shadow: 0 24px 64px rgba(2, 6, 23, 0.55);
     z-index: 25;
 }
 
@@ -645,13 +658,21 @@
     background: rgba(15, 23, 42, 0.75);
     color: #e2e8f0;
     font-size: 12px;
-    padding: 6px 10px;
+    font-weight: 600;
+    padding: 7px 12px;
     cursor: pointer;
+    transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.soundboard__tab:hover {
+    border-color: rgba(148, 163, 184, 0.7);
+    background: rgba(30, 41, 59, 0.85);
+    transform: translateY(-1px);
 }
 
 .soundboard__tab.is-active {
-    background: rgba(79, 70, 229, 0.35);
-    border-color: rgba(129, 140, 248, 0.8);
+    background: rgba(14, 116, 144, 0.35);
+    border-color: rgba(103, 232, 249, 0.65);
 }
 
 .soundboard__header {
@@ -665,6 +686,11 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+.soundboard__title {
+    font-size: 15px;
+    letter-spacing: 0.01em;
 }
 
 .soundboard__upload {
@@ -689,8 +715,9 @@
 }
 
 .soundboard__empty {
-    margin-top: 12px;
+    margin-top: 14px;
     color: rgba(226, 232, 240, 0.88);
+    padding: 10px 2px;
 }
 
 .soundboard__grid {
@@ -703,8 +730,15 @@
 .soundboard__item {
     border: 1px solid rgba(148, 163, 184, 0.3);
     border-radius: 12px;
-    padding: 10px;
-    background: rgba(15, 23, 42, 0.68);
+    padding: 11px;
+    background: linear-gradient(155deg, rgba(15, 23, 42, 0.8), rgba(7, 11, 21, 0.8));
+    transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.soundboard__item:hover {
+    border-color: rgba(125, 211, 252, 0.48);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.3);
 }
 
 
@@ -718,7 +752,7 @@
 .soundboard__meta {
     margin-top: 2px;
     font-size: 12px;
-    opacity: 0.8;
+    opacity: 0.84;
 }
 
 .soundboard__row {
@@ -736,4 +770,17 @@
     background: rgba(10, 16, 29, 0.92);
     color: #e2e8f0;
     padding: 6px 8px;
+}
+
+@media (max-width: 720px) {
+    .soundboard__panel {
+        bottom: 74px;
+        max-height: min(62vh, 520px);
+        padding: 12px;
+    }
+
+    .soundboard__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 }
