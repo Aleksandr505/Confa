@@ -726,6 +726,7 @@ function AvatarSync({
 }) {
     const participants = useRemoteParticipants();
     const room = useRoomContext();
+    const resolvedAvatarByUserIdRef = useRef<Map<number, string | null>>(new Map());
 
     const userIds = useMemo(() => {
         const ids = new Set<number>();
@@ -740,53 +741,83 @@ function AvatarSync({
         }
         return Array.from(ids).sort((a, b) => a - b);
     }, [participants, room.localParticipant?.identity]);
+    const userIdsKey = useMemo(() => userIds.join(','), [userIds]);
 
     useEffect(() => {
-        if (userIds.length === 0) return;
-        let cancelled = false;
-        const validateUrl = (url: string) =>
-            new Promise<boolean>(resolve => {
-                const img = new Image();
-                img.onload = () => resolve(true);
-                img.onerror = () => resolve(false);
-                img.src = url;
-            });
+        resolvedAvatarByUserIdRef.current.clear();
+    }, [roomName]);
 
-        const sync = async () => {
+    useEffect(() => {
+        if (!userIdsKey) {
+            resolvedAvatarByUserIdRef.current.clear();
+            return;
+        }
+        const activeUserIds = new Set(
+            userIdsKey
+                .split(',')
+                .map(value => Number(value))
+                .filter(value => Number.isFinite(value) && value > 0),
+        );
+        for (const cachedUserId of resolvedAvatarByUserIdRef.current.keys()) {
+            if (!activeUserIds.has(cachedUserId)) {
+                resolvedAvatarByUserIdRef.current.delete(cachedUserId);
+            }
+        }
+    }, [userIdsKey]);
+
+    useEffect(() => {
+        if (!userIdsKey) return;
+        const currentUserIds = userIdsKey
+            .split(',')
+            .map(value => Number(value))
+            .filter(value => Number.isFinite(value) && value > 0);
+        if (currentUserIds.length === 0) return;
+        let cancelled = false;
+        const unresolvedUserIds = currentUserIds.filter(
+            userId => !resolvedAvatarByUserIdRef.current.has(userId),
+        );
+        if (unresolvedUserIds.length === 0) return;
+
+        void (async () => {
             try {
-                const items = await resolveAvatarsBatch(userIds, undefined, roomName);
+                const items = await resolveAvatarsBatch(unresolvedUserIds, undefined, roomName);
                 if (cancelled) return;
+                const resolvedByUserId = new Map<number, string | null>();
                 for (const item of items) {
-                    const identity = String(item.userId);
-                    if (item.contentUrl) {
-                        const resolvedUrl = item.contentUrl.startsWith('http')
+                    if (!item.userId) continue;
+                    const resolvedUrl = item.contentUrl
+                        ? item.contentUrl.startsWith('http')
                             ? item.contentUrl
-                            : `${import.meta.env.VITE_API_BASE}${item.contentUrl}`;
-                        const isOk = await validateUrl(resolvedUrl);
-                        setAvatarUrlOverride(identity, isOk ? resolvedUrl : null);
-                    } else {
-                        setAvatarUrlOverride(identity, null);
+                            : `${import.meta.env.VITE_API_BASE}${item.contentUrl}`
+                        : null;
+                    resolvedByUserId.set(item.userId, resolvedUrl);
+                }
+
+                let changed = false;
+                for (const userId of unresolvedUserIds) {
+                    const nextUrl = resolvedByUserId.get(userId) ?? null;
+                    const prevUrl = resolvedAvatarByUserIdRef.current.get(userId);
+                    resolvedAvatarByUserIdRef.current.set(userId, nextUrl);
+                    if (prevUrl !== nextUrl) {
+                        setAvatarUrlOverride(String(userId), nextUrl);
+                        changed = true;
                     }
                 }
-                onResolved();
+
+                if (changed) {
+                    onResolved();
+                }
             } catch (e) {
                 if (!cancelled) {
                     console.warn('Failed to sync avatars', e);
                 }
             }
-        };
-
-        void sync();
-        const timer = window.setInterval(() => {
-            if (document.hidden) return;
-            void sync();
-        }, 15000);
+        })();
 
         return () => {
             cancelled = true;
-            window.clearInterval(timer);
         };
-    }, [onResolved, roomName, userIds]);
+    }, [onResolved, roomName, userIdsKey]);
 
     return null;
 }
