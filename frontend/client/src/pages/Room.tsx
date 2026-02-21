@@ -1214,7 +1214,9 @@ function BrandedVideoConference({
     const lastAutoFocusedScreenShareTrack = useRef<TrackReferenceOrPlaceholder | null>(null);
     const layoutContext = useCreateLayoutContext();
     const [screenShareError, setScreenShareError] = useState<string | null>(null);
+    const [secondaryMenuOpen, setSecondaryMenuOpen] = useState(false);
     const room = useRoomContext();
+    const secondaryMenuRef = useRef<HTMLDivElement | null>(null);
 
     const tracks = useTracks(
         [
@@ -1316,6 +1318,27 @@ function BrandedVideoConference({
         }
     }, [isDeafened]);
 
+    useEffect(() => {
+        if (!secondaryMenuOpen) return;
+        const onPointerDown = (event: PointerEvent) => {
+            const target = event.target as Node | null;
+            if (!target) return;
+            if (secondaryMenuRef.current?.contains(target)) return;
+            setSecondaryMenuOpen(false);
+        };
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setSecondaryMenuOpen(false);
+            }
+        };
+        window.addEventListener('pointerdown', onPointerDown);
+        window.addEventListener('keydown', onKeyDown);
+        return () => {
+            window.removeEventListener('pointerdown', onPointerDown);
+            window.removeEventListener('keydown', onKeyDown);
+        };
+    }, [secondaryMenuOpen]);
+
     const toggleDeafen = () => {
         setIsDeafened(current => !current);
     };
@@ -1366,10 +1389,25 @@ function BrandedVideoConference({
                             <DeafenIcon muted={isDeafened} />
                             <span>Audio off</span>
                         </button>
-                        <Soundboard
-                            roomName={roomName}
-                            triggerClassName="lk-button lk-soundboard-button"
-                        />
+                        <div
+                            ref={secondaryMenuRef}
+                            className="lk-secondary-controls"
+                            data-open={secondaryMenuOpen ? 'true' : 'false'}
+                        >
+                            <Soundboard
+                                roomName={roomName}
+                                triggerClassName="lk-button lk-soundboard-button lk-secondary-action"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            className="lk-button lk-more-button"
+                            aria-expanded={secondaryMenuOpen}
+                            aria-haspopup="menu"
+                            onClick={() => setSecondaryMenuOpen(current => !current)}
+                        >
+                            <span>More</span>
+                        </button>
                     </div>
                 </div>
                 {screenShareError && (

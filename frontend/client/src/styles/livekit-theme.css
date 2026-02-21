@@ -117,10 +117,24 @@
     order: 4;
 }
 .lk-control-bar-row .lk-control-bar > .lk-button-group:has([data-lk-source="microphone"]) {
-    order: 1;
+    order: 2;
 }
 .lk-control-bar-row .lk-control-bar > .lk-button-group:has([data-lk-source="camera"]) {
-    order: 3;
+    order: 4;
+}
+.lk-control-bar-row .lk-button-group {
+    display: inline-flex;
+    width: auto;
+    flex: 0 0 auto;
+    align-items: stretch;
+}
+.lk-control-bar-row .lk-button-group > [data-lk-source] {
+    min-width: clamp(132px, 16vw, 182px);
+    min-height: 52px;
+    white-space: nowrap;
+}
+.lk-control-bar-row .lk-button-group > button {
+    min-height: 52px;
 }
 .lk-control-bar-row[data-audio-off="true"] [data-lk-source="microphone"] {
     pointer-events: none;
@@ -128,8 +142,9 @@
     cursor: not-allowed;
 }
 .lk-deafen-button {
-    min-width: 140px;
-    order: 2;
+    min-width: clamp(124px, 14vw, 170px);
+    min-height: 52px;
+    order: 3;
 }
 .lk-deafen-button[data-lk-enabled="true"] {
     background: rgba(239, 68, 68, 0.28);
@@ -140,6 +155,109 @@
 .lk-deafen-icon {
     width: 20px;
     height: 20px;
+}
+.lk-secondary-controls {
+    order: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+.lk-soundboard-button {
+    min-width: clamp(118px, 12vw, 158px);
+    min-height: 52px;
+}
+.lk-more-button {
+    display: none;
+    min-width: 90px;
+    min-height: 52px;
+    order: 5;
+}
+
+@media (max-width: 1024px) {
+    .lk-control-bar-row {
+        gap: 8px;
+        padding: 10px;
+    }
+
+    .lk-control-bar-row .lk-button-group > [data-lk-source] {
+        min-width: clamp(116px, 19vw, 154px);
+        min-height: 48px;
+    }
+
+    .lk-control-bar-row .lk-button-group > button {
+        min-height: 48px;
+    }
+
+    .lk-deafen-button {
+        min-width: clamp(110px, 16vw, 142px);
+        min-height: 48px;
+    }
+
+    .lk-soundboard-button,
+    .lk-more-button {
+        min-height: 48px;
+    }
+}
+
+@media (max-width: 780px) {
+    .lk-control-bar-row {
+        padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+        gap: 7px;
+        flex-wrap: nowrap;
+        justify-content: center;
+    }
+
+    .lk-control-bar-row .lk-button-group > [data-lk-source] {
+        min-width: clamp(98px, 24vw, 128px);
+        min-height: 44px;
+        font-size: clamp(12px, 2.7vw, 14px);
+    }
+
+    .lk-control-bar-row .lk-button-group > button {
+        min-height: 44px;
+    }
+
+    .lk-deafen-button {
+        min-width: clamp(98px, 24vw, 128px);
+        min-height: 44px;
+    }
+
+    .lk-soundboard-button,
+    .lk-more-button {
+        min-height: 44px;
+    }
+
+    .lk-secondary-controls {
+        display: none;
+    }
+
+    .lk-more-button {
+        display: inline-flex;
+        min-width: 86px;
+    }
+
+    .lk-secondary-controls[data-open="true"] {
+        position: absolute;
+        right: 10px;
+        bottom: calc(100% + 8px);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        min-width: 180px;
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: rgba(10, 15, 28, 0.95);
+        box-shadow: 0 14px 32px rgba(2, 6, 23, 0.45);
+        z-index: 40;
+    }
+
+    .lk-secondary-controls[data-open="true"] .lk-secondary-action {
+        min-width: 100%;
+        justify-content: center;
+    }
 }
 
 .prejoin-shell {
@@ -607,7 +725,6 @@
 }
 
 .lk-soundboard-button {
-    min-width: 112px;
     font-weight: 700;
     letter-spacing: 0.01em;
 }
