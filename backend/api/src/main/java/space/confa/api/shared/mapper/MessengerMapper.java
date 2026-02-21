@@ -33,7 +33,8 @@ public final class MessengerMapper {
                 entity.getIsPrivate(),
                 entity.getPosition(),
                 entity.getCreatedByUserId(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                0L
         );
     }
 

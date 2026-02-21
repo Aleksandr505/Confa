@@ -13,5 +13,6 @@ public record ChannelDto(
         Boolean isPrivate,
         Integer position,
         Long createdByUserId,
-        Instant createdAt
+        Instant createdAt,
+        Long unreadCount
 ) {}

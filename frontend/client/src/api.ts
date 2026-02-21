@@ -58,6 +58,7 @@ export type ChannelDto = {
     position: number;
     createdByUserId: number;
     createdAt: string;
+    unreadCount?: number;
 };
 
 export type MessageDto = {
@@ -121,6 +122,14 @@ export type DmSummary = {
     peerUsername: string;
     lastMessageBody?: string | null;
     lastMessageAt?: string | null;
+    unreadCount?: number;
+};
+
+export type ReadStateDto = {
+    channelId: number;
+    userId: number;
+    lastReadMessageId: number;
+    lastReadAt?: string | null;
 };
 
 export async function fetchWorkspaces(): Promise<WorkspaceDto[]> {
@@ -247,6 +256,16 @@ export async function removeMessageReaction(messageId: number, emoji: string): P
         `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
         { method: 'DELETE' },
     );
+}
+
+export async function markChannelRead(
+    channelId: number,
+    payload: { lastReadMessageId: number },
+): Promise<ReadStateDto> {
+    return http<ReadStateDto>(`/api/channels/${channelId}/read`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
 }
 
 export async function uploadMyAvatar(

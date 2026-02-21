@@ -7,6 +7,7 @@ import {
     createDmChannel,
     createChannelMessage,
     fetchChannelMessages,
+    markChannelRead,
     removeMessageReaction,
     resolveAvatarsBatch,
 } from '../api';
@@ -16,7 +17,7 @@ import MessageTimeline from '../components/MessageTimeline';
 
 export default function ChannelViewPage() {
     const { channelId } = useParams();
-    const { channels } = useAppShell();
+    const { channels, refreshWorkspaceChannels } = useAppShell();
     const [messages, setMessages] = useState<MessageDto[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -24,9 +25,11 @@ export default function ChannelViewPage() {
     const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
     const [showScrollDown, setShowScrollDown] = useState(false);
     const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<number, string>>({});
+    const resolvedAvatarByUserIdRef = useRef<Map<number, string | null>>(new Map());
     const listRef = useRef<HTMLDivElement | null>(null);
     const composerRef = useRef<HTMLTextAreaElement | null>(null);
     const autoScrollRef = useRef(true);
+    const lastMarkedReadMessageIdRef = useRef<number | null>(null);
     const navigate = useNavigate();
     const myUserId = useMemo(() => {
         const identity = getUserIdentity();
@@ -53,6 +56,12 @@ export default function ChannelViewPage() {
         [messages],
     );
     const avatarUsersKey = avatarUserIds.join(',');
+
+    useEffect(() => {
+        resolvedAvatarByUserIdRef.current.clear();
+        setAvatarUrlByUserId({});
+        lastMarkedReadMessageIdRef.current = null;
+    }, [currentChannelId]);
 
     useEffect(() => {
         if (!currentChannelId || isVoice) return;
@@ -98,24 +107,57 @@ export default function ChannelViewPage() {
     }, [currentChannelId, isVoice]);
 
     useEffect(() => {
-        if (avatarUserIds.length === 0) {
+        if (!avatarUsersKey) {
+            resolvedAvatarByUserIdRef.current.clear();
             setAvatarUrlByUserId({});
             return;
         }
+        const userIds = avatarUsersKey
+            .split(',')
+            .map(value => Number(value))
+            .filter(value => Number.isFinite(value) && value > 0);
+        if (userIds.length === 0) return;
+        const active = new Set(userIds);
+        for (const cachedUserId of resolvedAvatarByUserIdRef.current.keys()) {
+            if (!active.has(cachedUserId)) {
+                resolvedAvatarByUserIdRef.current.delete(cachedUserId);
+            }
+        }
+        const unresolvedUserIds = userIds.filter(userId => !resolvedAvatarByUserIdRef.current.has(userId));
+        if (unresolvedUserIds.length === 0) return;
+
         let cancelled = false;
         const syncAvatars = async () => {
             try {
-                const items = await resolveAvatarsBatch(avatarUserIds);
+                const items = await resolveAvatarsBatch(unresolvedUserIds);
                 if (cancelled) return;
-                const next: Record<number, string> = {};
+                const resolvedBatch = new Map<number, string | null>();
                 for (const item of items) {
-                    if (!item.contentUrl) continue;
-                    const resolvedUrl = item.contentUrl.startsWith('http')
-                        ? item.contentUrl
-                        : `${import.meta.env.VITE_API_BASE}${item.contentUrl}`;
-                    next[item.userId] = resolvedUrl;
+                    const resolvedUrl = item.contentUrl
+                        ? item.contentUrl.startsWith('http')
+                            ? item.contentUrl
+                            : `${import.meta.env.VITE_API_BASE}${item.contentUrl}`
+                        : null;
+                    resolvedBatch.set(item.userId, resolvedUrl);
                 }
-                setAvatarUrlByUserId(next);
+                setAvatarUrlByUserId(prev => {
+                    const next = { ...prev };
+                    let changed = false;
+                    for (const userId of unresolvedUserIds) {
+                        const url = resolvedBatch.get(userId) ?? null;
+                        resolvedAvatarByUserIdRef.current.set(userId, url);
+                        if (url) {
+                            if (next[userId] !== url) {
+                                next[userId] = url;
+                                changed = true;
+                            }
+                        } else if (next[userId]) {
+                            delete next[userId];
+                            changed = true;
+                        }
+                    }
+                    return changed ? next : prev;
+                });
             } catch (e) {
                 if (!cancelled) console.warn('Failed to sync channel message avatars', e);
             }
@@ -133,6 +175,24 @@ export default function ChannelViewPage() {
         if (!list || !autoScrollRef.current) return;
         list.scrollTop = list.scrollHeight;
     }, [messages]);
+
+    useEffect(() => {
+        if (!currentChannelId || isVoice || messages.length === 0) return;
+        const latest = messages[messages.length - 1];
+        if (!latest?.id) return;
+        if (lastMarkedReadMessageIdRef.current === latest.id) return;
+        let cancelled = false;
+        void markChannelRead(currentChannelId, { lastReadMessageId: latest.id })
+            .then(() => {
+                if (cancelled) return;
+                lastMarkedReadMessageIdRef.current = latest.id;
+                void refreshWorkspaceChannels(true);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [currentChannelId, isVoice, messages, refreshWorkspaceChannels]);
 
     const autoResizeComposer = () => {
         const textarea = composerRef.current;

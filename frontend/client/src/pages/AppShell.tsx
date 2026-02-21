@@ -33,7 +33,8 @@ type AppShellState = {
     loadingChannels: boolean;
     loadingDms: boolean;
     refreshWorkspaces: () => Promise<void>;
-    refreshDms: () => Promise<void>;
+    refreshDms: (silent?: boolean) => Promise<void>;
+    refreshWorkspaceChannels: (silent?: boolean) => Promise<void>;
     openWorkspace: (workspaceId: number) => Promise<void>;
 };
 
@@ -80,6 +81,7 @@ export default function AppShellLayout() {
     const [channels, setChannels] = useState<ChannelDto[]>([]);
     const [dms, setDms] = useState<DmSummary[]>([]);
     const [dmAvatarUrlByUserId, setDmAvatarUrlByUserId] = useState<Record<number, string>>({});
+    const resolvedDmAvatarByUserIdRef = useRef<Map<number, string | null>>(new Map());
     const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
     const [loadingChannels, setLoadingChannels] = useState(false);
     const [loadingDms, setLoadingDms] = useState(true);
@@ -139,6 +141,15 @@ export default function AppShellLayout() {
         () => workspaceUsers.map(user => user.id).sort((a, b) => a - b).join(','),
         [workspaceUsers],
     );
+    const dmPeerUserIdsKey = useMemo(
+        () =>
+            Array.from(
+                new Set(dms.map(dm => dm.peerUserId).filter((id): id is number => Number.isFinite(id) && id > 0)),
+            )
+                .sort((a, b) => a - b)
+                .join(','),
+        [dms],
+    );
 
     const refreshWorkspaces = useCallback(async () => {
         setLoadingWorkspaces(true);
@@ -150,15 +161,29 @@ export default function AppShellLayout() {
         }
     }, []);
 
-    const refreshDms = useCallback(async () => {
-        setLoadingDms(true);
+    const refreshDms = useCallback(async (silent = false) => {
+        if (!silent) setLoadingDms(true);
         try {
             const list = await fetchDmList();
             setDms(list);
         } finally {
-            setLoadingDms(false);
+            if (!silent) setLoadingDms(false);
         }
     }, []);
+
+    const refreshWorkspaceChannels = useCallback(
+        async (silent = false) => {
+            if (!activeWorkspaceId) return;
+            if (!silent) setLoadingChannels(true);
+            try {
+                const list = await fetchWorkspaceChannels(activeWorkspaceId);
+                setChannels(list);
+            } finally {
+                if (!silent) setLoadingChannels(false);
+            }
+        },
+        [activeWorkspaceId],
+    );
 
     const openWorkspace = useCallback(async (id: number) => {
         setLoadingChannels(true);
@@ -339,27 +364,70 @@ export default function AppShellLayout() {
     }, []);
 
     useEffect(() => {
-        const userIds = Array.from(
-            new Set(
-                dms.map(dm => dm.peerUserId).filter((id): id is number => typeof id === 'number' && id > 0),
-            ),
-        );
+        const timer = window.setInterval(() => {
+            if (document.hidden) return;
+            void refreshDms(true);
+            if (activeWorkspaceId) {
+                void refreshWorkspaceChannels(true);
+            }
+        }, 4000);
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, [activeWorkspaceId, refreshDms, refreshWorkspaceChannels]);
+
+    useEffect(() => {
+        const userIds = dmPeerUserIdsKey
+            ? dmPeerUserIdsKey
+                  .split(',')
+                  .map(value => Number(value))
+                  .filter(value => Number.isFinite(value) && value > 0)
+            : [];
+
         if (userIds.length === 0) {
+            resolvedDmAvatarByUserIdRef.current.clear();
             setDmAvatarUrlByUserId({});
             return;
         }
 
+        const active = new Set(userIds);
+        for (const cachedUserId of resolvedDmAvatarByUserIdRef.current.keys()) {
+            if (!active.has(cachedUserId)) {
+                resolvedDmAvatarByUserIdRef.current.delete(cachedUserId);
+            }
+        }
+
+        const unresolvedUserIds = userIds.filter(userId => !resolvedDmAvatarByUserIdRef.current.has(userId));
+        if (unresolvedUserIds.length === 0) return;
+
         let cancelled = false;
         const syncAvatars = async () => {
             try {
-                const items = await resolveAvatarsBatch(userIds);
+                const items = await resolveAvatarsBatch(unresolvedUserIds);
                 if (cancelled) return;
-                const next: Record<number, string> = {};
+                const batch = new Map<number, string | null>();
                 for (const item of items) {
-                    const url = toAbsoluteAvatarUrl(item.contentUrl);
-                    if (url) next[item.userId] = url;
+                    batch.set(item.userId, toAbsoluteAvatarUrl(item.contentUrl) ?? null);
                 }
-                setDmAvatarUrlByUserId(next);
+
+                setDmAvatarUrlByUserId(prev => {
+                    const next = { ...prev };
+                    let changed = false;
+                    for (const userId of unresolvedUserIds) {
+                        const url = batch.get(userId) ?? null;
+                        resolvedDmAvatarByUserIdRef.current.set(userId, url);
+                        if (url) {
+                            if (next[userId] !== url) {
+                                next[userId] = url;
+                                changed = true;
+                            }
+                        } else if (next[userId]) {
+                            delete next[userId];
+                            changed = true;
+                        }
+                    }
+                    return changed ? next : prev;
+                });
             } catch (e) {
                 if (!cancelled) console.warn('Failed to sync DM avatars', e);
             }
@@ -370,7 +438,7 @@ export default function AppShellLayout() {
         return () => {
             cancelled = true;
         };
-    }, [dms]);
+    }, [dmPeerUserIdsKey]);
 
     useEffect(() => {
         if (!activeWorkspaceId) return;
@@ -498,6 +566,7 @@ export default function AppShellLayout() {
             loadingDms,
             refreshWorkspaces,
             refreshDms,
+            refreshWorkspaceChannels,
             openWorkspace,
         }),
         [
@@ -508,6 +577,7 @@ export default function AppShellLayout() {
             loadingWorkspaces,
             loadingChannels,
             loadingDms,
+            refreshWorkspaceChannels,
         ],
     );
 
@@ -623,6 +693,11 @@ export default function AppShellLayout() {
                                                     : null}
                                             </span>
                                             <span className="dm-name">{dm.peerUsername}</span>
+                                            {(dm.unreadCount ?? 0) > 0 && (
+                                                <span className="unread-badge dm-unread-badge">
+                                                    {dm.unreadCount}
+                                                </span>
+                                            )}
                                             <span className="dm-snippet">
                                                 {dm.lastMessageBody || 'No messages yet'}
                                             </span>
@@ -655,6 +730,11 @@ export default function AppShellLayout() {
                                                 {channel.type === 'VOICE' ? '◎' : '#'}
                                             </span>
                                             <span className="channel-name">{channel.name || 'untitled'}</span>
+                                            {(channel.unreadCount ?? 0) > 0 && (
+                                                <span className="unread-badge">
+                                                    {channel.unreadCount}
+                                                </span>
+                                            )}
                                         </NavLink>
                                     );
                                     })}

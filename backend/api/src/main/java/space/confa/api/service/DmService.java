@@ -33,11 +33,24 @@ public class DmService {
                                u.id as peer_user_id,
                                u.username as peer_username,
                                m.body as last_message_body,
-                               m.created_at as last_message_at
+                               m.created_at as last_message_at,
+                               COALESCE((
+                                   SELECT COUNT(*)
+                                   FROM message m_unread
+                                   WHERE m_unread.channel_id = c.id
+                                     AND m_unread.deleted_at IS NULL
+                                     AND m_unread.sender_user_id IS NOT NULL
+                                     AND m_unread.sender_user_id <> :userId
+                                     AND (
+                                         crs.last_read_message_id IS NULL
+                                         OR m_unread.id > crs.last_read_message_id
+                                     )
+                               ), 0) AS unread_count
                         FROM channel c
                         JOIN channel_member cm_self ON cm_self.channel_id = c.id AND cm_self.user_id = :userId
                         JOIN channel_member cm_peer ON cm_peer.channel_id = c.id AND cm_peer.user_id <> :userId
                         JOIN user u ON u.id = cm_peer.user_id
+                        LEFT JOIN channel_read_state crs ON crs.channel_id = c.id AND crs.user_id = :userId
                         LEFT JOIN message m ON m.id = (
                             SELECT id FROM message
                             WHERE channel_id = c.id
@@ -53,7 +66,8 @@ public class DmService {
                         row.get("peer_user_id", Long.class),
                         row.get("peer_username", String.class),
                         row.get("last_message_body", String.class),
-                        row.get("last_message_at", java.time.Instant.class)
+                        row.get("last_message_at", java.time.Instant.class),
+                        row.get("unread_count", Long.class)
                 ))
                 .all();
     }

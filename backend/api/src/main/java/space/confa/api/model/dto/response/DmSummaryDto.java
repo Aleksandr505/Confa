@@ -7,5 +7,6 @@ public record DmSummaryDto(
         Long peerUserId,
         String peerUsername,
         String lastMessageBody,
-        Instant lastMessageAt
+        Instant lastMessageAt,
+        Long unreadCount
 ) {}
