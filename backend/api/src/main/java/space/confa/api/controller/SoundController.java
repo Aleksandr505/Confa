@@ -15,6 +15,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import space.confa.api.model.dto.request.PlaySoundDto;
 import space.confa.api.model.dto.request.ShareSoundDto;
+import space.confa.api.model.dto.request.StopSoundDto;
 import space.confa.api.model.dto.response.SoundClipDto;
 import space.confa.api.service.SoundService;
 
@@ -87,6 +88,14 @@ public class SoundController {
             @Valid @RequestBody PlaySoundDto dto
     ) {
         return soundService.play(userId(jwt), soundId, dto.roomName());
+    }
+
+    @PostMapping("/stop")
+    public Mono<Void> stop(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody StopSoundDto dto
+    ) {
+        return soundService.stop(userId(jwt), dto.roomName());
     }
 
     @GetMapping("/content/{soundId}")

@@ -210,6 +210,14 @@ public class SoundService {
                         }));
     }
 
+    public Mono<Void> stop(Long userId, String roomName) {
+        if (roomName == null || roomName.isBlank()) {
+            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "roomName is required"));
+        }
+        return resolveMemberRoom(userId, roomName)
+                .then(sendStopEvent(userId, roomName));
+    }
+
     public Mono<SoundContent> getSoundContent(Long soundId) {
         return soundClipRepository.findById(soundId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Sound not found")))
@@ -371,15 +379,10 @@ public class SoundService {
                 .then(generateSoundUrl(sound)
                         .flatMap(url -> Mono.fromRunnable(() -> {
                             try {
-                                List<LivekitModels.ParticipantInfo> participants = roomServiceClient.listParticipants(roomName)
-                                        .execute()
-                                        .body();
-                                if (participants == null || participants.isEmpty()) {
+                                List<String> sids = resolveParticipantSids(roomName);
+                                if (sids.isEmpty()) {
                                     return;
                                 }
-                                List<String> sids = participants.stream()
-                                        .map(LivekitModels.ParticipantInfo::getSid)
-                                        .toList();
 
                                 Map<String, Object> payload = new LinkedHashMap<>();
                                 payload.put("v", 1);
@@ -397,6 +400,41 @@ public class SoundService {
                                 throw new UncheckedIOException(e);
                             }
                         }).subscribeOn(Schedulers.boundedElastic()).then()));
+    }
+
+    private Mono<Void> sendStopEvent(Long userId, String roomName) {
+        return roomAccessService.checkUserCanJoin(userId, roomName)
+                .then(Mono.fromRunnable(() -> {
+                    try {
+                        List<String> sids = resolveParticipantSids(roomName);
+                        if (sids.isEmpty()) {
+                            return;
+                        }
+                        Map<String, Object> payload = new LinkedHashMap<>();
+                        payload.put("v", 1);
+                        payload.put("type", "sound.stop");
+                        payload.put("from", String.valueOf(userId));
+                        payload.put("ts", Instant.now().toEpochMilli());
+
+                        byte[] bytes = objectMapper.writeValueAsBytes(payload);
+                        roomServiceClient.sendData(roomName, bytes, LivekitModels.DataPacket.Kind.RELIABLE, sids)
+                                .execute();
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }).subscribeOn(Schedulers.boundedElastic()).then());
+    }
+
+    private List<String> resolveParticipantSids(String roomName) throws IOException {
+        List<LivekitModels.ParticipantInfo> participants = roomServiceClient.listParticipants(roomName)
+                .execute()
+                .body();
+        if (participants == null || participants.isEmpty()) {
+            return List.of();
+        }
+        return participants.stream()
+                .map(LivekitModels.ParticipantInfo::getSid)
+                .toList();
     }
 
     private Mono<SoundClipDto> toDto(SoundClipEntity sound, boolean sharedToCurrentRoom) {

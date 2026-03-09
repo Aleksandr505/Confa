@@ -532,6 +532,13 @@ export async function playSoundClip(soundId: number, roomName: string): Promise<
     });
 }
 
+export async function stopSoundboard(roomName: string): Promise<void> {
+    await http<void>('/api/sounds/stop', {
+        method: 'POST',
+        body: JSON.stringify({ roomName }),
+    });
+}
+
 export async function shareSoundClip(soundId: number, targetRoomName: string): Promise<void> {
     await http<void>(`/api/sounds/${soundId}/share`, {
         method: 'POST',

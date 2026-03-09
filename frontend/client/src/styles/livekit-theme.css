@@ -769,6 +769,26 @@
     flex-wrap: wrap;
 }
 
+.soundboard__controls {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.soundboard__volume {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.soundboard__volume input[type="range"] {
+    width: min(260px, 44vw);
+}
+
 .soundboard__tab {
     border: 1px solid rgba(148, 163, 184, 0.4);
     border-radius: 999px;
@@ -899,5 +919,14 @@
     .soundboard__header {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .soundboard__controls {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .soundboard__volume input[type="range"] {
+        width: min(320px, 72vw);
     }
 }

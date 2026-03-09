@@ -7,6 +7,7 @@ import {
     fetchSoundClips,
     playSoundClip,
     shareSoundClip,
+    stopSoundboard,
     uploadSoundClip,
     type SoundClipDto,
 } from '../api';
@@ -17,7 +18,7 @@ type Props = {
     triggerClassName?: string;
 };
 
-type SoundPayload = {
+type SoundPlayPayload = {
     v: 1;
     type: 'sound.play';
     soundId: number;
@@ -26,6 +27,15 @@ type SoundPayload = {
     from?: string;
     ts: number;
 };
+
+type SoundStopPayload = {
+    v: 1;
+    type: 'sound.stop';
+    from?: string;
+    ts: number;
+};
+
+type SoundPayload = SoundPlayPayload | SoundStopPayload;
 
 type SoundboardTab = 'room' | 'available';
 
@@ -39,7 +49,9 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [deleteMode, setDeleteMode] = useState(false);
+    const [playbackVolumePct, setPlaybackVolumePct] = useState(95);
     const incomingAudioRef = useRef<HTMLAudioElement | null>(null);
+    const playbackVolumeRef = useRef(0.95);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const isAdminUser = isAdmin();
 
@@ -49,11 +61,23 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
     }, [open, resolvedRoomName]);
 
     useEffect(() => {
+        const normalized = clampPercentToUnit(playbackVolumePct);
+        playbackVolumeRef.current = normalized;
+        if (incomingAudioRef.current) {
+            incomingAudioRef.current.volume = normalized;
+        }
+    }, [playbackVolumePct]);
+
+    useEffect(() => {
         const onDataReceived = (payload: Uint8Array) => {
             const parsed = safeParse(payload);
             if (!parsed) return;
             if (parsed.type === 'sound.play' && parsed.url) {
                 playIncomingSound(parsed.url);
+                return;
+            }
+            if (parsed.type === 'sound.stop') {
+                stopIncomingSound();
             }
         };
         room.on(RoomEvent.DataReceived, onDataReceived);
@@ -61,6 +85,8 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
             room.off(RoomEvent.DataReceived, onDataReceived);
         };
     }, [room]);
+
+    useEffect(() => () => stopIncomingSound(), []);
 
     useEffect(() => {
         if (!open) return;
@@ -102,6 +128,15 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
         }
     }
 
+    async function stopClipPlayback() {
+        if (!resolvedRoomName) return;
+        try {
+            await stopSoundboard(resolvedRoomName);
+        } catch (e: any) {
+            setError(e?.message || 'Не удалось остановить звук');
+        }
+    }
+
     async function uploadFile(file?: File | null) {
         if (!file || !resolvedRoomName) return;
         setError(null);
@@ -139,9 +174,19 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
         const resolved = url.startsWith('http') ? url : `${import.meta.env.VITE_API_BASE}${url}`;
         const audio = incomingAudioRef.current ?? new Audio();
         incomingAudioRef.current = audio;
+        audio.pause();
         audio.src = resolved;
-        audio.volume = 0.95;
+        audio.volume = playbackVolumeRef.current;
         void audio.play().catch(() => {});
+    }
+
+    function stopIncomingSound() {
+        const audio = incomingAudioRef.current;
+        if (!audio) return;
+        audio.pause();
+        audio.currentTime = 0;
+        audio.removeAttribute('src');
+        audio.load();
     }
 
     return (
@@ -210,6 +255,23 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
                                 Доступные ({availableClips.length})
                             </button>
                         </div>
+                        <div className="soundboard__controls">
+                            <label className="soundboard__volume">
+                                <span>Громкость</span>
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    value={playbackVolumePct}
+                                    onChange={event => setPlaybackVolumePct(Number(event.target.value))}
+                                />
+                                <strong>{playbackVolumePct}%</strong>
+                            </label>
+                            <button className="btn ghost small" type="button" onClick={() => void stopClipPlayback()}>
+                                Stop
+                            </button>
+                        </div>
 
                         {error && <div className="soundboard__error">{error}</div>}
                         {loading ? (
@@ -271,11 +333,18 @@ function safeParse(payload: Uint8Array): SoundPayload | null {
     try {
         const text = new TextDecoder().decode(payload);
         const data = JSON.parse(text) as SoundPayload;
-        if (data && data.v === 1 && data.type === 'sound.play' && 'url' in data) return data;
+        if (!data || data.v !== 1) return null;
+        if (data.type === 'sound.play' && 'url' in data) return data;
+        if (data.type === 'sound.stop') return data;
         return null;
     } catch {
         return null;
     }
+}
+
+function clampPercentToUnit(value: number): number {
+    if (Number.isNaN(value) || !Number.isFinite(value)) return 0.95;
+    return Math.max(0, Math.min(1, value / 100));
 }
 
 function normalizeClips(payload: unknown): SoundClipDto[] {
