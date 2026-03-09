@@ -78,6 +78,26 @@
     flex: 1;
     min-height: 0;
 }
+.lk-video-conference {
+    overflow: hidden;
+}
+.lk-video-conference-inner {
+    min-width: 0;
+    flex: 1 1 auto;
+    width: auto;
+    order: 2;
+}
+.lk-chat {
+    order: 1;
+    flex: 0 0 clamp(260px, 30vw, 420px);
+    width: clamp(260px, 30vw, 420px);
+    max-width: min(42vw, 420px);
+    margin: 10px 0 10px 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.34);
+    border-right: 1px solid rgba(148, 163, 184, 0.34);
+    overflow: hidden;
+}
 
 .lk-room-shell[data-lk-theme="default"] {
     --lk-bg: rgba(17, 24, 39, 0.55);
@@ -103,10 +123,15 @@
     justify-content: center;
     gap: 10px;
     padding: 12px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     position: relative;
     z-index: 30;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+}
+.lk-control-bar-row::-webkit-scrollbar {
+    display: none;
 }
 .lk-control-bar-row .lk-control-bar {
     padding: 0;
@@ -178,6 +203,7 @@
     .lk-control-bar-row {
         gap: 8px;
         padding: 10px;
+        justify-content: flex-start;
     }
 
     .lk-control-bar-row .lk-button-group > [data-lk-source] {
@@ -257,6 +283,37 @@
     .lk-secondary-controls[data-open="true"] .lk-secondary-action {
         min-width: 100%;
         justify-content: center;
+    }
+}
+
+@media (max-width: 1180px) {
+    .lk-video-conference {
+        position: relative;
+    }
+
+    .lk-chat {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        bottom: calc(var(--lk-control-bar-height) + 12px);
+        width: min(360px, calc(100% - 20px));
+        max-width: calc(100% - 20px);
+        margin: 0;
+        z-index: 35;
+        background: rgba(11, 15, 25, 0.96);
+        box-shadow: 0 14px 34px rgba(2, 6, 23, 0.45);
+    }
+}
+
+@media (max-width: 600px) {
+    .lk-chat {
+        left: 8px;
+        top: 8px;
+        right: 8px;
+        width: auto;
+        max-width: none;
+        bottom: calc(var(--lk-control-bar-height) + 8px + env(safe-area-inset-bottom));
+        border-radius: 12px;
     }
 }
 

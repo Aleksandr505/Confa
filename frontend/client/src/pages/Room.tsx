@@ -1442,6 +1442,7 @@ function BrandedVideoConference({
                         >
                             <Soundboard
                                 roomName={roomName}
+                                audioOff={isDeafened}
                                 triggerClassName="lk-button lk-soundboard-button lk-secondary-action"
                             />
                         </div>

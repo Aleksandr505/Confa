@@ -16,6 +16,7 @@ import { isAdmin } from '../lib/auth';
 type Props = {
     roomName?: string;
     triggerClassName?: string;
+    audioOff?: boolean;
 };
 
 type SoundPlayPayload = {
@@ -39,7 +40,7 @@ type SoundPayload = SoundPlayPayload | SoundStopPayload;
 
 type SoundboardTab = 'room' | 'available';
 
-export default function Soundboard({ roomName, triggerClassName }: Props) {
+export default function Soundboard({ roomName, triggerClassName, audioOff = false }: Props) {
     const room = useRoomContext();
     const resolvedRoomName = roomName || room.name;
     const [open, setOpen] = useState(false);
@@ -73,6 +74,7 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
             const parsed = safeParse(payload);
             if (!parsed) return;
             if (parsed.type === 'sound.play' && parsed.url) {
+                if (audioOff) return;
                 playIncomingSound(parsed.url);
                 return;
             }
@@ -84,7 +86,13 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
         return () => {
             room.off(RoomEvent.DataReceived, onDataReceived);
         };
-    }, [room]);
+    }, [audioOff, room]);
+
+    useEffect(() => {
+        if (audioOff) {
+            stopIncomingSound();
+        }
+    }, [audioOff]);
 
     useEffect(() => () => stopIncomingSound(), []);
 
@@ -121,6 +129,10 @@ export default function Soundboard({ roomName, triggerClassName }: Props) {
 
     async function playClip(clip: SoundClipDto) {
         if (!resolvedRoomName) return;
+        if (audioOff) {
+            setError('Audio off включен: soundboard отключён локально');
+            return;
+        }
         try {
             await playSoundClip(clip.id, resolvedRoomName);
         } catch (e: any) {
