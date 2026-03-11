@@ -28,7 +28,7 @@ export default function HomePage() {
     const [rooms, setRooms] = useState<RoomAccessSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
-    const [roomName, setRoomName] = useState('my-room');
+    const [roomName, setRoomName] = useState('');
     const [creating, setCreating] = useState(false);
     const [avatarBusy, setAvatarBusy] = useState(false);
     const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
@@ -123,7 +123,7 @@ export default function HomePage() {
             });
             setRooms(sorted);
             if (list.length === 0) {
-                setRoomName('my-room');
+                setRoomName('');
             }
         } catch (e: any) {
             setErr(e?.message || 'Не удалось получить список комнат');
