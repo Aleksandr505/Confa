@@ -1496,7 +1496,7 @@ function BrandedVideoConference({
                     >
                         <ControlBar
                             className="lk-control-bar--main"
-                            controls={{ chat: !disableChat, screenShare: true }}
+                            controls={{ chat: !disableChat, screenShare: true, camera: false }}
                             onDeviceError={({ source, error }) => {
                                 if (source === Track.Source.ScreenShare) {
                                     setScreenShareError(

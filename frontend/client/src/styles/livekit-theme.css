@@ -166,6 +166,13 @@
     flex: 0 0 auto;
     align-items: stretch;
 }
+.lk-control-bar-row .lk-button-group-menu {
+    display: none;
+}
+.lk-control-bar-row .lk-button-group > :first-child {
+    border-top-right-radius: var(--lk-border-radius);
+    border-bottom-right-radius: var(--lk-border-radius);
+}
 .lk-control-bar-row .lk-button-group > [data-lk-source] {
     min-width: clamp(132px, 16vw, 182px);
     min-height: 52px;
