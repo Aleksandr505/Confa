@@ -1261,8 +1261,11 @@ function BrandedVideoConference({
     const layoutContext = useCreateLayoutContext();
     const [screenShareError, setScreenShareError] = useState<string | null>(null);
     const [secondaryMenuOpen, setSecondaryMenuOpen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const room = useRoomContext();
+    const [isCameraEnabled, setIsCameraEnabled] = useState(() => room.localParticipant.isCameraEnabled);
     const secondaryMenuRef = useRef<HTMLDivElement | null>(null);
+    const moreButtonRef = useRef<HTMLButtonElement | null>(null);
 
     const tracks = useTracks(
         [
@@ -1338,15 +1341,25 @@ function BrandedVideoConference({
     useEffect(() => {
         if (!room) return;
         const participant = room.localParticipant;
+        const syncCamera = () => {
+            setIsCameraEnabled(participant.isCameraEnabled);
+        };
         const handleUnmuted = (publication: { source: Track.Source }) => {
             if (!isDeafened) return;
             if (publication.source === Track.Source.Microphone) {
                 void participant.setMicrophoneEnabled(false);
             }
         };
+        const handleTrackPublished = () => syncCamera();
+        const handleTrackUnpublished = () => syncCamera();
+        syncCamera();
         participant.on(ParticipantEvent.TrackUnmuted, handleUnmuted);
+        participant.on(ParticipantEvent.LocalTrackPublished, handleTrackPublished);
+        participant.on(ParticipantEvent.LocalTrackUnpublished, handleTrackUnpublished);
         return () => {
             participant.off(ParticipantEvent.TrackUnmuted, handleUnmuted);
+            participant.off(ParticipantEvent.LocalTrackPublished, handleTrackPublished);
+            participant.off(ParticipantEvent.LocalTrackUnpublished, handleTrackUnpublished);
         };
     }, [isDeafened, room]);
 
@@ -1370,6 +1383,7 @@ function BrandedVideoConference({
             const target = event.target as Node | null;
             if (!target) return;
             if (secondaryMenuRef.current?.contains(target)) return;
+            if (moreButtonRef.current?.contains(target)) return;
             setSecondaryMenuOpen(false);
         };
         const onKeyDown = (event: KeyboardEvent) => {
@@ -1385,8 +1399,71 @@ function BrandedVideoConference({
         };
     }, [secondaryMenuOpen]);
 
+    useEffect(() => {
+        const isRoomShellFullscreen = () => {
+            const fullscreenEl =
+                document.fullscreenElement ??
+                ((document as Document & { webkitFullscreenElement?: Element | null }).webkitFullscreenElement ?? null);
+            if (!(fullscreenEl instanceof HTMLElement)) {
+                setIsFullscreen(false);
+                return;
+            }
+            setIsFullscreen(fullscreenEl.classList.contains('lk-room-shell'));
+        };
+
+        isRoomShellFullscreen();
+        document.addEventListener('fullscreenchange', isRoomShellFullscreen);
+        document.addEventListener('webkitfullscreenchange', isRoomShellFullscreen as EventListener);
+        return () => {
+            document.removeEventListener('fullscreenchange', isRoomShellFullscreen);
+            document.removeEventListener('webkitfullscreenchange', isRoomShellFullscreen as EventListener);
+        };
+    }, []);
+
     const toggleDeafen = () => {
         setIsDeafened(current => !current);
+    };
+
+    const toggleCamera = async () => {
+        const next = !room.localParticipant.isCameraEnabled;
+        try {
+            await room.localParticipant.setCameraEnabled(next);
+            setIsCameraEnabled(next);
+        } catch (error) {
+            console.warn('Failed to toggle camera', error);
+        }
+    };
+
+    const toggleFullscreen = async () => {
+        const roomShell = document.querySelector<HTMLElement>('.lk-room-shell');
+        if (!roomShell) return;
+        const docWithWebkit = document as Document & {
+            webkitFullscreenElement?: Element | null;
+            webkitExitFullscreen?: () => Promise<void> | void;
+        };
+        const shellWithWebkit = roomShell as HTMLElement & {
+            webkitRequestFullscreen?: () => Promise<void> | void;
+        };
+        const activeFullscreenEl = document.fullscreenElement ?? docWithWebkit.webkitFullscreenElement ?? null;
+        const isRoomFullscreen = activeFullscreenEl === roomShell;
+
+        try {
+            if (isRoomFullscreen) {
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if (docWithWebkit.webkitExitFullscreen) {
+                    await docWithWebkit.webkitExitFullscreen();
+                }
+            } else {
+                if (roomShell.requestFullscreen) {
+                    await roomShell.requestFullscreen();
+                } else if (shellWithWebkit.webkitRequestFullscreen) {
+                    await shellWithWebkit.webkitRequestFullscreen();
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to toggle fullscreen', error);
+        }
     };
 
     return (
@@ -1411,7 +1488,12 @@ function BrandedVideoConference({
                             </FocusLayoutContainer>
                         </div>
                     )}
-                    <div className="lk-control-bar-row" data-lk-control-bar data-audio-off={isDeafened ? 'true' : 'false'}>
+                    <div
+                        className="lk-control-bar-row"
+                        data-lk-control-bar
+                        data-audio-off={isDeafened ? 'true' : 'false'}
+                        data-menu-open={secondaryMenuOpen ? 'true' : 'false'}
+                    >
                         <ControlBar
                             className="lk-control-bar--main"
                             controls={{ chat: !disableChat, screenShare: true }}
@@ -1424,36 +1506,65 @@ function BrandedVideoConference({
                                 }
                             }}
                         />
-                        <button
-                            type="button"
-                            className="lk-button lk-deafen-button"
-                            aria-pressed={isDeafened}
-                            data-lk-enabled={isDeafened}
-                            onClick={toggleDeafen}
-                            title={isDeafened ? 'Audio off enabled' : 'Audio off'}
-                        >
-                            <DeafenIcon muted={isDeafened} />
-                            <span>Audio off</span>
-                        </button>
+                        <Soundboard
+                            roomName={roomName}
+                            audioOff={isDeafened}
+                            triggerClassName="lk-button lk-soundboard-button"
+                        />
                         <div
                             ref={secondaryMenuRef}
                             className="lk-secondary-controls"
                             data-open={secondaryMenuOpen ? 'true' : 'false'}
                         >
-                            <Soundboard
-                                roomName={roomName}
-                                audioOff={isDeafened}
-                                triggerClassName="lk-button lk-soundboard-button lk-secondary-action"
-                            />
+                            <button
+                                type="button"
+                                className="lk-button lk-secondary-action"
+                                aria-pressed={isFullscreen}
+                                onClick={() => {
+                                    void toggleFullscreen();
+                                    setSecondaryMenuOpen(false);
+                                }}
+                                title={isFullscreen ? 'Выйти из полноэкранного режима' : 'Открыть во весь экран'}
+                            >
+                                <span>{isFullscreen ? '🗗 Exit full' : '🖥️ Full screen'}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="lk-button lk-secondary-action"
+                                aria-pressed={isCameraEnabled}
+                                onClick={() => {
+                                    void toggleCamera();
+                                    setSecondaryMenuOpen(false);
+                                }}
+                                title={isCameraEnabled ? 'Выключить камеру' : 'Включить камеру'}
+                            >
+                                <span>{isCameraEnabled ? '📷 Camera on' : '📷 Camera off'}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="lk-button lk-secondary-action lk-deafen-menu-action"
+                                aria-pressed={isDeafened}
+                                data-lk-enabled={isDeafened}
+                                onClick={() => {
+                                    toggleDeafen();
+                                    setSecondaryMenuOpen(false);
+                                }}
+                                title={isDeafened ? 'Audio off enabled' : 'Audio off'}
+                            >
+                                <DeafenIcon muted={isDeafened} />
+                                <span>🔇 Audio off</span>
+                            </button>
                         </div>
                         <button
+                            ref={moreButtonRef}
                             type="button"
                             className="lk-button lk-more-button"
                             aria-expanded={secondaryMenuOpen}
                             aria-haspopup="menu"
+                            aria-label="Дополнительные действия"
                             onClick={() => setSecondaryMenuOpen(current => !current)}
                         >
-                            <span>More</span>
+                            <span>⋮</span>
                         </button>
                     </div>
                 </div>
