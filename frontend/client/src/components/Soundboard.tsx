@@ -47,6 +47,7 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
     const [roomClips, setRoomClips] = useState<SoundClipDto[]>([]);
     const [availableClips, setAvailableClips] = useState<SoundClipDto[]>([]);
     const [tab, setTab] = useState<SoundboardTab>('room');
+    const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [deleteMode, setDeleteMode] = useState(false);
@@ -201,6 +202,9 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
         audio.load();
     }
 
+    const currentClips = tab === 'room' ? roomClips : availableClips;
+    const filteredClips = filterClipsBySearch(currentClips, search);
+
     return (
         <div className="soundboard">
             <button
@@ -267,6 +271,15 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
                                 Доступные ({availableClips.length})
                             </button>
                         </div>
+                        <div className="soundboard__search">
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={event => setSearch(event.target.value)}
+                                placeholder="Поиск по названию, ID или комнате"
+                                aria-label="Поиск звуков в soundboard"
+                            />
+                        </div>
                         <div className="soundboard__controls">
                             <label className="soundboard__volume">
                                 <span>Громкость</span>
@@ -292,9 +305,11 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
                             <div className="soundboard__empty">Пока нет звуков для этой комнаты.</div>
                         ) : tab === 'available' && availableClips.length === 0 ? (
                             <div className="soundboard__empty">Нет доступных звуков из других комнат.</div>
+                        ) : filteredClips.length === 0 ? (
+                            <div className="soundboard__empty">По вашему запросу ничего не найдено.</div>
                         ) : (
                             <div className="soundboard__grid">
-                                {(tab === 'room' ? roomClips : availableClips).map(clip => (
+                                {filteredClips.map(clip => (
                                     <div className="soundboard__item" key={clip.id}>
                                         <div className="soundboard__name" title={clip.name}>
                                             {clip.name}
@@ -375,4 +390,15 @@ function normalizeClips(payload: unknown): SoundClipDto[] {
         return sortByNewest((payload as any).items as SoundClipDto[]);
     }
     return [];
+}
+
+function filterClipsBySearch(items: SoundClipDto[], query: string): SoundClipDto[] {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return items;
+    return items.filter(clip => {
+        const id = String(clip.id);
+        const name = (clip.name || '').toLowerCase();
+        const sourceRoom = (clip.sourceRoomName || '').toLowerCase();
+        return id.includes(normalized) || name.includes(normalized) || sourceRoom.includes(normalized);
+    });
 }
