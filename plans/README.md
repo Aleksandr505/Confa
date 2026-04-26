@@ -24,25 +24,28 @@ Do not create a plan for a small local fix that can be understood from the code 
 
 ## Naming
 
-Use a stable, dated slug:
+Use a stable ordered slug for active plans:
 
 ```text
-YYYYMMDD-short-task-name.md
+NNNN-short-task-name.md
 ```
 
 Example:
 
 ```text
-20260426-agent-control-hardening.md
+0003-agent-control-hardening.md
 ```
+
+Keep `created` and `updated` dates in the plan front matter. When moving a completed plan to `archive/`, keep the same numbered filename unless there is a strong reason to rename it.
 
 ## Lifecycle
 
 1. Copy `templates/task-plan.md` into `active/`.
-2. Fill in goal, scope, affected paths, assumptions, and verification.
-3. Keep the checklist current while work is in progress.
-4. When finished, move reusable facts into durable docs.
-5. Move the plan to `archive/` only if it remains useful; otherwise delete it.
+2. Give it the next available `NNNN-` prefix.
+3. Fill in goal, scope, affected paths, assumptions, and verification.
+4. Keep the checklist current while work is in progress.
+5. When finished, move reusable facts into durable docs.
+6. Move the plan to `archive/` only if it remains useful; otherwise delete it.
 
 ## Rules
 
@@ -50,4 +53,3 @@ Example:
 - Link to source files and docs instead of pasting large code excerpts.
 - Record open questions and blockers explicitly.
 - Do not store secrets, credentials, private customer data, or generated build output in plans.
-
