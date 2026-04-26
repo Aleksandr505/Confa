@@ -29,6 +29,20 @@ A compact but production-style demo of a secure, AI-assisted video conferencing 
 
 ---
 
+## Documentation
+
+Start with [`docs/index.md`](docs/index.md) for repository documentation.
+
+Useful entry points:
+
+* [`docs/references/repo-map.md`](docs/references/repo-map.md) – module map and verification commands
+* [`docs/architecture/system-context.md`](docs/architecture/system-context.md) – runtime components and major flows
+* [`docs/contracts/shared-runtime-contracts.md`](docs/contracts/shared-runtime-contracts.md) – contracts shared by backend, frontends, agents, and deploy
+* [`docs/operations/local-development.md`](docs/operations/local-development.md) – local startup and validation
+* [`docs/documentation-playbook.md`](docs/documentation-playbook.md) – rules for keeping docs useful
+
+---
+
 ## Architecture Overview
 
 Public entrypoints:
@@ -153,13 +167,13 @@ Basic flow:
 
 ```bash
 cd backend
-mvn spring-boot:run
+./mvnw -pl api spring-boot:run
 ```
 
 **Client SPA**
 
 ```bash
-cd client
+cd frontend/client
 npm install
 npm run dev
 ```
@@ -167,7 +181,7 @@ npm run dev
 **Admin SPA**
 
 ```bash
-cd admin-client
+cd frontend/admin-client
 npm install
 npm run dev
 ```

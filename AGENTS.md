@@ -17,6 +17,7 @@ Prefer the closest nested `AGENTS.md` when working inside a module.
 - Keep cross-module contracts explicit. API DTOs, LiveKit room names, participant identities, participant metadata, JWT claims, and env variable names are shared by multiple modules.
 - Do not commit secrets or generated local state. Keep `.env`, `*.local`, `node_modules`, `dist`, `target`, and deployment build envs out of source changes.
 - Existing README files are useful context, but the source code is authoritative when they differ.
+- Use `docs/index.md` for repository documentation and `docs/documentation-playbook.md` for documentation rules.
 - Use the package manager already present in each module: Maven wrapper in `backend`, npm in both frontend apps, pnpm in `agents`.
 - Keep changes scoped to the module being modified. Avoid broad formatting-only churn across Java, TypeScript, CSS, YAML, or SQL files.
 
@@ -28,4 +29,3 @@ Prefer the closest nested `AGENTS.md` when working inside a module.
 - Agents worker: `cd agents && pnpm build`
 
 Run the checks that match the files you changed. If a check needs external services or credentials, state that instead of faking coverage.
-
