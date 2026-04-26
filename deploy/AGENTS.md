@@ -4,6 +4,8 @@
 
 This directory contains production-oriented deployment assets: Docker Compose, Caddy routing, LiveKit config, env generation, image build/push helpers, and Liquibase runtime wiring.
 
+Use `../docs/operations/deployment.md` as the current deployment runbook.
+
 ## Files
 
 - `docker-compose.yml`: service topology for Caddy, LiveKit, API, client, admin client, MySQL, Redis, MinIO, Liquibase, and OneTimeSecret.
@@ -26,4 +28,3 @@ This directory contains production-oriented deployment assets: Docker Compose, C
 - For script changes, run the relevant script in a disposable profile or dry-run mentally if it would push images or require secrets.
 - For Compose changes, prefer `docker compose --env-file .env config` in `deploy/` when a local env file is available.
 - For Caddy changes, verify hostnames and admin access restrictions explicitly before production use.
-

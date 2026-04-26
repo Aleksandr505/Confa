@@ -22,6 +22,7 @@ canonical_sources:
 related:
   - docs/architecture/system-context.md
   - docs/glossary.md
+  - docs/security/auth-and-access.md
 ---
 
 # Shared Runtime Contracts
@@ -92,4 +93,3 @@ Changing any item in this table requires coordinated changes in `backend/api`, `
 - `liquibase-changelog.yaml` includes all scripts from that directory.
 - Java domain enums and frontend TypeScript unions must stay compatible with MySQL enum columns.
 - Soft-delete columns such as `deleted_at` must be preserved in list queries and indexes.
-

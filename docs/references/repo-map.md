@@ -38,6 +38,7 @@ Confa is a monorepo for realtime conferencing, messenger-style collaboration, AI
 | `agents/` | LiveKit Agents worker | Node.js, TypeScript, pnpm, LiveKit Agents SDK | `pnpm build` |
 | `deploy/` | Deployment topology and scripts | Docker Compose, Caddy, LiveKit, Liquibase | `docker compose --env-file .env config` when env exists |
 | `docs/` | Cross-cutting repository documentation | Markdown with front matter | `git diff --check` |
+| `plans/` | Active and archived implementation plans | Markdown task plans | `git diff --check` |
 
 ## Backend API Layout
 
@@ -65,4 +66,3 @@ The admin SPA has route-level pages for bootstrap, login, users, and rooms. It c
 - `node_modules/`, `dist/`, `target/`, `.env`, `*.local`, and deployment build env files are local or generated and should not be edited as source.
 - `agents/src/*.js`, `agents/src/*.d.ts`, and maps are tracked TypeScript compiler outputs. Prefer editing `.ts` sources unless a task explicitly requires generated outputs to be synchronized.
 - Liquibase SQL migrations are hand-authored canonical schema history once created.
-

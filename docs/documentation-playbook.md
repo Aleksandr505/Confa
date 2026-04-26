@@ -36,6 +36,7 @@ Do not use this file as a reason to create a large docs tree. Add documentation 
 - `AGENTS.md`: root agent routing, shared constraints, and verification commands.
 - `<module>/AGENTS.md`: local rules that differ from the repository defaults.
 - `docs/`: durable cross-cutting knowledge that does not belong to a single source directory.
+- `plans/`: temporary working plans for active or recently completed multi-step tasks.
 - Existing code, migrations, manifests, and deployment files remain the source of truth for behavior.
 
 Current major areas:
@@ -58,6 +59,8 @@ Document a change when it affects any of these:
 - local development setup that is not obvious from package manifests or build files.
 
 Skip documentation when the code is self-explanatory and the behavior is local, private, and covered by nearby names or tests.
+
+Use `plans/` instead of durable docs when the content is task-specific, temporary, or only needed for handoff during implementation.
 
 ## Canonical Sources
 

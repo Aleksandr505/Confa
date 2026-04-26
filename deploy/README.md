@@ -1,5 +1,8 @@
 # 🚀 Deployment Guide
 
+Current canonical deployment runbook: [`../docs/operations/deployment.md`](../docs/operations/deployment.md).
+Treat the rest of this file as legacy orientation if it conflicts with the runbook or current files in `deploy/`.
+
 This document describes how to build, configure, and deploy the full application stack — including the backend (Spring Boot), frontend (Client & Admin, both built with React + Vite), and Docker Compose configuration.
 
 ---
@@ -234,5 +237,3 @@ update
   ```
 
 - Each environment (dev, staging, prod) can have its own `.env` and build envs.
-
-

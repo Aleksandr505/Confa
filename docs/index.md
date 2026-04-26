@@ -24,7 +24,10 @@ Use this directory for durable cross-cutting knowledge about Confa. Keep module-
 - [System Context](architecture/system-context.md): runtime components, trust boundaries, and major flows.
 - [Shared Runtime Contracts](contracts/shared-runtime-contracts.md): cross-module contracts that must stay in sync.
 - [Local Development](operations/local-development.md): local commands and required services.
+- [Deployment Runbook](operations/deployment.md): current Docker Compose deployment workflow.
+- [Auth And Access](security/auth-and-access.md): authentication, authorization, bootstrap, CORS, and admin restrictions.
 - [Glossary](glossary.md): project terms used across backend, frontend, agents, and deploy.
+- [Plans](../plans/README.md): active task planning area for multi-step work.
 
 ## Local Module Docs
 
@@ -41,5 +44,5 @@ Use this directory for durable cross-cutting knowledge about Confa. Keep module-
 - Update docs in the same change when behavior, contracts, env vars, migrations, or operational steps change.
 - Prefer links to canonical source files over duplicated prose.
 - Do not add empty directories or placeholder pages.
+- Use `plans/` for temporary implementation plans, not as the source of truth for finished behavior.
 - Keep root docs short and route readers to the nearest specific source.
-

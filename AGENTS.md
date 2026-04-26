@@ -18,6 +18,7 @@ Prefer the closest nested `AGENTS.md` when working inside a module.
 - Do not commit secrets or generated local state. Keep `.env`, `*.local`, `node_modules`, `dist`, `target`, and deployment build envs out of source changes.
 - Existing README files are useful context, but the source code is authoritative when they differ.
 - Use `docs/index.md` for repository documentation and `docs/documentation-playbook.md` for documentation rules.
+- Use `plans/` for multi-step task plans that need handoff or cross-module tracking.
 - Use the package manager already present in each module: Maven wrapper in `backend`, npm in both frontend apps, pnpm in `agents`.
 - Keep changes scoped to the module being modified. Avoid broad formatting-only churn across Java, TypeScript, CSS, YAML, or SQL files.
 

@@ -39,7 +39,10 @@ Useful entry points:
 * [`docs/architecture/system-context.md`](docs/architecture/system-context.md) – runtime components and major flows
 * [`docs/contracts/shared-runtime-contracts.md`](docs/contracts/shared-runtime-contracts.md) – contracts shared by backend, frontends, agents, and deploy
 * [`docs/operations/local-development.md`](docs/operations/local-development.md) – local startup and validation
+* [`docs/operations/deployment.md`](docs/operations/deployment.md) – deployment runbook for the current Compose stack
+* [`docs/security/auth-and-access.md`](docs/security/auth-and-access.md) – auth, roles, bootstrap, CORS, and admin access
 * [`docs/documentation-playbook.md`](docs/documentation-playbook.md) – rules for keeping docs useful
+* [`plans/README.md`](plans/README.md) – working plans for multi-step tasks
 
 ---
 
@@ -149,7 +152,8 @@ Typical production setup (see `deploy/docker-compose.yml` + `Caddyfile`):
 * `admin-client` – admin SPA (nginx)
 * `livekit` – LiveKit server
 * `mysql` – database
-* `agents` – LiveKit agents worker (Node.js)
+
+The AI agents worker is implemented in `agents/`, but the current `deploy/docker-compose.yml` does not declare an `agents` service yet. See `docs/operations/deployment.md` for the current deployment runbook and known cleanup items.
 
 Basic flow:
 

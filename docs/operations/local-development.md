@@ -20,6 +20,7 @@ canonical_sources:
 related:
   - docs/references/repo-map.md
   - docs/contracts/shared-runtime-contracts.md
+  - docs/operations/deployment.md
 ---
 
 # Local Development
@@ -131,4 +132,3 @@ docker compose --env-file .env config
 ```
 
 Do not run `build_push.sh` casually. It builds and pushes multi-architecture images.
-
