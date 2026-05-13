@@ -34,16 +34,20 @@ This page records contracts that cross module boundaries. Treat the listed sourc
 | Contract | Current behavior | Canonical source |
 | --- | --- | --- |
 | Login endpoint | `POST /auth` returns access token through the `Authorization` response header. | `LoginController.java`, `frontend/*/src/api.ts` |
+| Registration endpoint | `POST /auth/register` is rate-limited, validates registration credentials, creates a `PENDING` user, and returns no token. | `LoginController.java`, `RegisterUserDto.java`, `UserService.java`, `frontend/client/src/api.ts` |
 | Refresh endpoint | `POST /auth/refresh` is called automatically after `401` responses. | `LoginController.java`, `frontend/*/src/lib/http.ts` |
 | Role claim | JWT authorities are read from the `scope` claim and converted to `ROLE_*`. | `SecurityConfiguration.java` |
 | Admin access | `/admin/**` requires `ADMIN`; deploy additionally restricts admin paths by IP. | `SecurityConfiguration.java`, `deploy/Caddyfile` |
+| User lifecycle | `PENDING`, `ACTIVE`, `REJECTED`; only `ACTIVE` users authenticate. | `UserStatus.java`, `UserRepository.java`, `LoginService.java` |
+| Admin user DTO | Admin user responses include role, lifecycle status, block and approval metadata, but not password hashes. | `UserDto.java`, `UserMapper.java`, `frontend/admin-client/src/api.ts` |
 
 ## Main HTTP Surface
 
 | Area | Representative endpoints | Primary callers |
 | --- | --- | --- |
 | Auth | `/auth`, `/auth/refresh` | Client SPA, Admin SPA |
-| Admin | `/admin/bootstrap/status`, `/admin/bootstrap`, `/admin/users` | Admin SPA |
+| Registration | `/auth/register` | Client SPA |
+| Admin | `/admin/bootstrap/status`, `/admin/bootstrap`, `/admin/users`, `/admin/registration-requests` | Admin SPA |
 | Rooms | `/rooms`, `/rooms/my`, `/rooms/{room}/config`, `/rooms/{room}/participants` | Client SPA, Admin SPA |
 | LiveKit token | `/livekit/token`, `/api/channels/{channelId}/livekit-token` | Client SPA |
 | Agents | `/rooms/{room}/agents`, `/invite`, `/kick`, `/mute`, `/focus`, `/enable`, `/disable` | Client SPA, Admin SPA |

@@ -11,9 +11,13 @@ public class UserMapper {
         return new UserDto(
                 entity.getId(),
                 entity.getRole(),
+                entity.getStatus(),
                 entity.getUsername(),
-                entity.getPassword(),
                 entity.getBlockedAt(),
+                entity.getApprovedAt(),
+                entity.getApprovedByUserId(),
+                entity.getRejectedAt(),
+                entity.getRejectedByUserId(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );

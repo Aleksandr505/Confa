@@ -1,5 +1,17 @@
 import { http } from './lib/http';
-import { setTokens, loadTokensFromSession } from './lib/auth';
+import { setTokens } from './lib/auth';
+
+async function readErrorMessage(resp: Response, fallback: string): Promise<string> {
+    const raw = await resp.text().catch(() => '');
+    if (!raw.trim()) return fallback;
+
+    try {
+        const parsed = JSON.parse(raw) as { message?: string; error?: string };
+        return parsed.message || parsed.error || fallback;
+    } catch {
+        return raw || fallback;
+    }
+}
 
 export async function login(username: string, password: string) {
     const resp = await fetch(`${import.meta.env.VITE_API_BASE}/auth`, {
@@ -8,12 +20,23 @@ export async function login(username: string, password: string) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
     });
-    if (!resp.ok) throw new Error('Login failed');
+    if (!resp.ok) throw new Error(await readErrorMessage(resp, 'Login failed'));
 
     const authHeader = resp.headers.get('Authorization');
     const access = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
     if (!access) throw new Error('Access token missing');
     setTokens(access || undefined);
+}
+
+export async function register(username: string, password: string): Promise<void> {
+    const resp = await fetch(`${import.meta.env.VITE_API_BASE}/auth/register`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password }),
+    });
+
+    if (!resp.ok) throw new Error(await readErrorMessage(resp, 'Registration failed'));
 }
 
 export async function fetchLivekitToken(room?: string, displayName?: string) {
@@ -551,6 +574,3 @@ export async function unshareSoundClip(soundId: number, targetRoomName: string):
         method: 'DELETE',
     });
 }
-
-
-loadTokensFromSession();

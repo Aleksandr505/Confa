@@ -9,17 +9,21 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import space.confa.api.configuration.properties.JWTProp;
 import space.confa.api.model.domain.AppHttpHeader;
 import space.confa.api.model.domain.exception.TooManyLoginAttemptsException;
 import space.confa.api.model.dto.request.AuthDto;
+import space.confa.api.model.dto.request.RegisterUserDto;
 import space.confa.api.service.IpBanService;
 import space.confa.api.service.LoginRateLimiter;
 import space.confa.api.service.LoginService;
+import space.confa.api.service.UserService;
 
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Optional;
 
 @Slf4j
@@ -32,6 +36,7 @@ public class LoginController {
     private final JWTProp jwtProp;
     private final LoginRateLimiter loginRateLimiter;
     private final IpBanService ipBanService;
+    private final UserService userService;
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<Void>> authenticate(
@@ -51,7 +56,12 @@ public class LoginController {
                     }
 
                     return loginService.authenticate(authDto)
-                            .onErrorResume(e -> ipBanService.registerFailure(clientIp, authDto.username()).then(Mono.error(e)))
+                            .onErrorResume(e -> {
+                                if (!shouldRegisterFailure(e)) {
+                                    return Mono.error(e);
+                                }
+                                return ipBanService.registerFailure(clientIp, authDto.username()).then(Mono.error(e));
+                            })
                             .map(pair -> {
                                 ResponseCookie refreshCookie = ResponseCookie
                                         .from("refresh_token", pair.refreshToken())
@@ -68,6 +78,44 @@ public class LoginController {
                                         .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                                         .build();
                             });
+                });
+    }
+
+    private boolean shouldRegisterFailure(Throwable e) {
+        if (e instanceof ResponseStatusException responseStatusException) {
+            return responseStatusException.getStatusCode().value() == 400;
+        }
+
+        return true;
+    }
+
+    @PostMapping(value = "/register", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<ResponseEntity<Void>> register(
+            @Valid @RequestBody RegisterUserDto registerUserDto,
+            ServerHttpRequest request
+    ) {
+        String clientIp = resolveClientIp(request);
+        String normalizedUsername = registerUserDto.username().trim().toLowerCase(Locale.ROOT);
+
+        return loginRateLimiter.tryConsume("register:ip:" + clientIp)
+                .flatMap(ipAllowed -> {
+                    if (!ipAllowed) {
+                        return Mono.error(new TooManyLoginAttemptsException(
+                                "Too many registration attempts. Please try again later."
+                        ));
+                    }
+
+                    return loginRateLimiter.tryConsume("register:user:" + clientIp + ":" + normalizedUsername);
+                })
+                .flatMap(userAllowed -> {
+                    if (!userAllowed) {
+                        return Mono.error(new TooManyLoginAttemptsException(
+                                "Too many registration attempts. Please try again later."
+                        ));
+                    }
+
+                    return userService.registerUser(registerUserDto.username(), registerUserDto.password())
+                            .thenReturn(ResponseEntity.accepted().build());
                 });
     }
 

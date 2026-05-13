@@ -303,6 +303,26 @@ button {
     color: #e0e7ff;
 }
 
+.badge-status {
+    min-width: 76px;
+    justify-content: center;
+}
+
+.badge-active {
+    background: rgba(34, 197, 94, 0.18);
+    color: #bbf7d0;
+}
+
+.badge-pending {
+    background: rgba(251, 191, 36, 0.18);
+    color: #fde68a;
+}
+
+.badge-rejected {
+    background: rgba(248, 113, 113, 0.16);
+    color: #fecaca;
+}
+
 .info-block {
     margin-top: 16px;
     padding: 10px 12px;
@@ -333,6 +353,14 @@ button {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+}
+
+.section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
 }
 
 .room-toolbar {

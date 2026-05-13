@@ -3,7 +3,7 @@ title: Registration With Admin Approval
 status: active
 owner: core-team
 created: 2026-04-26
-updated: 2026-04-26
+updated: 2026-05-13
 applies_to:
   - backend/api/
   - frontend/client/
@@ -76,39 +76,39 @@ Out of scope:
 
 ## Backend Plan
 
-- [ ] Add Liquibase migration for user lifecycle fields.
-- [ ] Add Java enum/domain representation for lifecycle status.
-- [ ] Update `UserEntity`, DTOs, mappers, and repository SQL.
-- [ ] Update `UserRepository.findByUsername` so only `ACTIVE` and not blocked users can authenticate.
-- [ ] Add public registration API, likely `POST /auth/register`.
-- [ ] Ensure registration does not issue JWT tokens.
-- [ ] Add admin APIs for pending requests:
+- [x] Add Liquibase migration for user lifecycle fields.
+- [x] Add Java enum/domain representation for lifecycle status.
+- [x] Update `UserEntity`, DTOs, mappers, and repository SQL.
+- [x] Update `UserRepository.findByUsername` so only `ACTIVE` and not blocked users can authenticate.
+- [x] Add public registration API, likely `POST /auth/register`.
+- [x] Ensure registration does not issue JWT tokens.
+- [x] Add admin APIs for pending requests:
   - list pending requests;
   - approve request;
   - reject request.
-- [ ] Keep bootstrap admin and admin-created users active by default.
-- [ ] Return clear errors for pending/rejected users at login.
+- [x] Keep bootstrap admin and admin-created users active by default.
+- [x] Return clear errors for pending/rejected users at login.
 
 ## Frontend Plan
 
-- [ ] Add registration entry point from the user login page.
-- [ ] Add registration form with username/password validation matching backend constraints.
-- [ ] Show a clear post-registration pending message.
-- [ ] Show a specific login error when the account is pending or rejected.
-- [ ] Add admin UI section for pending registration requests.
-- [ ] Add approve/reject actions with confirmation.
-- [ ] Keep existing user management flows working for active users.
+- [x] Add registration entry point from the user login page.
+- [x] Add registration form with username/password validation matching backend constraints.
+- [x] Show a clear post-registration pending message.
+- [x] Show a specific login error when the account is pending or rejected.
+- [x] Add admin UI section for pending registration requests.
+- [x] Add approve/reject actions with confirmation.
+- [x] Keep existing user management flows working for active users.
 
 ## Verification
 
-- [ ] Backend test: existing active user can log in.
-- [ ] Backend test: pending user cannot log in.
-- [ ] Backend test: rejected user cannot log in.
-- [ ] Backend test: approved user can log in after approval.
-- [ ] Backend test: public registration creates `PENDING` user and does not return a token.
-- [ ] Admin frontend build: `cd frontend/admin-client && npm run build`.
-- [ ] Client frontend build: `cd frontend/client && npm run build`.
-- [ ] Backend check: `cd backend && ./mvnw -pl api test`.
+- [x] Backend test: existing active user can log in.
+- [x] Backend test: pending user cannot log in.
+- [x] Backend test: rejected user cannot log in.
+- [x] Backend test: approved user can log in after approval.
+- [x] Backend test: public registration creates `PENDING` user and does not return a token.
+- [x] Admin frontend build: `cd frontend/admin-client && npm run build`.
+- [x] Client frontend build: `cd frontend/client && npm run build`.
+- [x] Backend check: `cd backend && ./mvnw -pl api clean test`.
 
 ## Open Questions
 
@@ -119,5 +119,4 @@ Out of scope:
 
 ## Handoff Notes
 
-Implement backend lifecycle first. The frontend should not infer pending state from generic `401`; backend needs a stable error shape or status code behavior that the client can render.
-
+Backend, client, and admin implementation is in place. Backend unit tests cover the core registration lifecycle, login gating, duplicate username conflicts, and wrong-password handling for pending users. Registration now has backend validation and throttling, and admin user DTOs do not expose password hashes. Frontend lint still fails on pre-existing baseline issues outside this plan's changed lines.

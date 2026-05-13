@@ -68,7 +68,7 @@ public class SecurityConfiguration {
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .pathMatchers("/admin/**").access(hasRole("ADMIN"))
                      //   .pathMatchers("/admin/**").permitAll()
-                        .pathMatchers("/auth", "/auth/refresh").permitAll()
+                        .pathMatchers("/auth", "/auth/refresh", "/auth/register").permitAll()
                       //  .pathMatchers("/rooms/**").hasRole("ADMIN")
                         .pathMatchers("/rooms/**").authenticated()
                         .pathMatchers("/livekit/token").authenticated()

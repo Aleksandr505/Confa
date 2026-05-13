@@ -14,6 +14,8 @@ import space.confa.api.model.dto.response.BootstrapStatusDto;
 import space.confa.api.model.dto.response.UserDto;
 import space.confa.api.service.UserService;
 
+import java.security.Principal;
+
 @Slf4j
 @RestController
 @RequiredArgsConstructor
@@ -39,6 +41,11 @@ public class AdminController {
         return userService.getUsers();
     }
 
+    @GetMapping(value = "/registration-requests", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Flux<UserDto> getRegistrationRequests() {
+        return userService.getRegistrationRequests();
+    }
+
     @PostMapping(value = "/users", produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<UserDto> createUser(
             @Valid @RequestBody CreateUserDto dto
@@ -58,6 +65,22 @@ public class AdminController {
             @PathVariable Long id
     ) {
         return userService.unblockUser(id);
+    }
+
+    @PatchMapping(value = "/users/{id}/approve", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<UserDto> approveUser(
+            @PathVariable Long id,
+            Principal principal
+    ) {
+        return userService.approveUser(id, Long.parseLong(principal.getName()));
+    }
+
+    @PatchMapping(value = "/users/{id}/reject", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<UserDto> rejectUser(
+            @PathVariable Long id,
+            Principal principal
+    ) {
+        return userService.rejectUser(id, Long.parseLong(principal.getName()));
     }
 
     @DeleteMapping(value = "/users/{id}", produces = MediaType.APPLICATION_JSON_VALUE)

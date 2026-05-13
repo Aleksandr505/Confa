@@ -1,6 +1,18 @@
 import { http } from './lib/http';
 import {setTokens} from "./lib/auth.ts";
 
+async function readErrorMessage(resp: Response, fallback: string): Promise<string> {
+    const raw = await resp.text().catch(() => '');
+    if (!raw.trim()) return fallback;
+
+    try {
+        const parsed = JSON.parse(raw) as { message?: string; error?: string };
+        return parsed.message || parsed.error || fallback;
+    } catch {
+        return raw || fallback;
+    }
+}
+
 export type BootstrapStatusResponse = {
     isInitialized: boolean;
 };
@@ -34,9 +46,7 @@ export async function loginAdmin(username: string, password: string): Promise<vo
         body: JSON.stringify({ username, password }),
     });
 
-    if (!resp.ok) {
-        throw new Error('Login failed');
-    }
+    if (!resp.ok) throw new Error(await readErrorMessage(resp, 'Login failed'));
 
     const authHeader = resp.headers.get('Authorization');
     const access = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
@@ -48,7 +58,14 @@ export type UserDto = {
     id: string;
     username: string;
     role: 'USER' | 'ADMIN';
+    status: 'PENDING' | 'ACTIVE' | 'REJECTED';
     blockedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    approvedAt?: string | null;
+    approvedByUserId?: string | null;
+    rejectedAt?: string | null;
+    rejectedByUserId?: string | null;
 };
 
 export type CreateUserRequest = {
@@ -59,6 +76,10 @@ export type CreateUserRequest = {
 
 export async function fetchUsers(): Promise<UserDto[]> {
     return http<UserDto[]>('/admin/users', { method: 'GET' });
+}
+
+export async function fetchRegistrationRequests(): Promise<UserDto[]> {
+    return http<UserDto[]>('/admin/registration-requests', { method: 'GET' });
 }
 
 export async function createUser(payload: CreateUserRequest): Promise<UserDto> {
@@ -76,6 +97,18 @@ export async function blockUser(id: string): Promise<UserDto> {
 
 export async function unblockUser(id: string): Promise<UserDto> {
     return http<UserDto>(`/admin/users/${id}/unblock`, {
+        method: 'PATCH',
+    });
+}
+
+export async function approveUser(id: string): Promise<UserDto> {
+    return http<UserDto>(`/admin/users/${id}/approve`, {
+        method: 'PATCH',
+    });
+}
+
+export async function rejectUser(id: string): Promise<UserDto> {
+    return http<UserDto>(`/admin/users/${id}/reject`, {
         method: 'PATCH',
     });
 }

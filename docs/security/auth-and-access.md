@@ -36,6 +36,18 @@ This page summarizes current auth and access behavior. Source files listed in `c
 | JWT signing | HS256 with `JWT_SECRET` through Nimbus encoder/decoder. |
 | Access token TTL | `JWT_ACCESS_EXPIRATION`, default `PT10M`. |
 | Refresh token TTL | `JWT_REFRESH_EXPIRATION`, default `PT12H`. |
+| User lifecycle | `PENDING`, `ACTIVE`, or `REJECTED`. Only `ACTIVE` users can authenticate. |
+
+## Registration Flow
+
+1. Browser posts username and password to `POST /auth/register`.
+2. API applies registration throttling before password hashing.
+3. Registration usernames must be 3-64 ASCII letters, digits, `.`, `_`, or `-`; passwords must be 8-128 characters.
+4. API creates a `USER` account with status `PENDING`.
+5. API returns `202 Accepted` and does not issue JWT tokens.
+6. Admin reviews the request under `/admin/registration-requests`.
+7. Admin approves through `PATCH /admin/users/{id}/approve` or rejects through `PATCH /admin/users/{id}/reject`.
+8. Approved users become `ACTIVE` and can log in. Rejected users remain unable to log in.
 
 ## Login Flow
 
@@ -63,6 +75,7 @@ Spring Security currently applies these path rules:
 | --- | --- |
 | `OPTIONS /**` | Public. |
 | `/auth`, `/auth/refresh` | Public. |
+| `/auth/register` | Public. |
 | `/admin/**` | Requires `ADMIN`. |
 | `/rooms/**` | Requires authentication. |
 | `/livekit/token` | Requires authentication. |
@@ -122,8 +135,8 @@ When changing auth or access behavior:
 
 - Update backend security config and affected controllers together.
 - Update frontend auth/http helpers if login, refresh, or token transport changes.
+- Update admin registration approval flows if user lifecycle states change.
 - Update `deploy/Caddyfile` if admin host or IP restrictions change.
 - Update CORS if public frontend origins change.
 - Update `docs/contracts/shared-runtime-contracts.md` when endpoint or JWT contracts change.
 - Verify with backend tests and at least one browser login flow when possible.
-

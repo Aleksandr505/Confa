@@ -1,9 +1,12 @@
 import {type FormEvent, useEffect, useState } from 'react';
 import {
+    approveUser,
     blockUser,
     createUser,
     deleteUser,
+    fetchRegistrationRequests,
     fetchUsers,
+    rejectUser,
     unblockUser,
     type UserDto,
 } from '../api';
@@ -14,8 +17,13 @@ type NewUserForm = {
     role: 'USER' | 'ADMIN';
 };
 
+function errorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 export default function UsersPage() {
     const [users, setUsers] = useState<UserDto[]>([]);
+    const [requests, setRequests] = useState<UserDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
@@ -29,10 +37,14 @@ export default function UsersPage() {
         setLoading(true);
         setErr(null);
         try {
-            const data = await fetchUsers();
-            setUsers(data);
-        } catch (e: any) {
-            setErr(e?.message || 'Не удалось загрузить пользователей');
+            const [usersData, requestsData] = await Promise.all([
+                fetchUsers(),
+                fetchRegistrationRequests(),
+            ]);
+            setUsers(usersData);
+            setRequests(requestsData);
+        } catch (e: unknown) {
+            setErr(errorMessage(e, 'Не удалось загрузить пользователей'));
         } finally {
             setLoading(false);
         }
@@ -50,8 +62,8 @@ export default function UsersPage() {
             setUsers(prev => [...prev, created]);
             setForm({ username: '', password: '', role: 'USER' });
             setCreating(false);
-        } catch (e: any) {
-            setErr(e?.message || 'Не удалось создать пользователя');
+        } catch (e: unknown) {
+            setErr(errorMessage(e, 'Не удалось создать пользователя'));
         }
     }
 
@@ -60,8 +72,8 @@ export default function UsersPage() {
         try {
             await deleteUser(id);
             setUsers(prev => prev.filter(u => u.id !== id));
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось удалить пользователя');
+        } catch (e: unknown) {
+            alert(errorMessage(e, 'Не удалось удалить пользователя'));
         }
     }
 
@@ -74,10 +86,44 @@ export default function UsersPage() {
             setUsers(prev =>
                 prev.map(x => (x.id === updated.id ? updated : x)),
             );
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось изменить статус пользователя');
+        } catch (e: unknown) {
+            alert(errorMessage(e, 'Не удалось изменить статус пользователя'));
         }
     }
+
+    async function onApprove(u: UserDto) {
+        if (!confirm(`Одобрить заявку пользователя ${u.username}?`)) return;
+        try {
+            const updated = await approveUser(u.id);
+            setRequests(prev => prev.filter(x => x.id !== updated.id));
+            setUsers(prev => {
+                const exists = prev.some(x => x.id === updated.id);
+                return exists
+                    ? prev.map(x => (x.id === updated.id ? updated : x))
+                    : [...prev, updated];
+            });
+        } catch (e: unknown) {
+            alert(errorMessage(e, 'Не удалось одобрить заявку'));
+        }
+    }
+
+    async function onReject(u: UserDto) {
+        if (!confirm(`Отклонить заявку пользователя ${u.username}?`)) return;
+        try {
+            const updated = await rejectUser(u.id);
+            setRequests(prev => prev.filter(x => x.id !== updated.id));
+            setUsers(prev => {
+                const exists = prev.some(x => x.id === updated.id);
+                return exists
+                    ? prev.map(x => (x.id === updated.id ? updated : x))
+                    : [...prev, updated];
+            });
+        } catch (e: unknown) {
+            alert(errorMessage(e, 'Не удалось отклонить заявку'));
+        }
+    }
+
+    const visibleUsers = users.filter(u => u.status !== 'PENDING');
 
     return (
         <div className="page">
@@ -92,6 +138,63 @@ export default function UsersPage() {
             </div>
 
             {err && <div className="alert alert-error">{err}</div>}
+
+            <div className="card card-inline">
+                <div className="section-header">
+                    <div>
+                        <h2>Заявки на регистрацию</h2>
+                        <p className="muted">Новые пользователи не смогут войти, пока администратор не одобрит заявку.</p>
+                    </div>
+                    <button className="btn ghost small" onClick={load} disabled={loading}>
+                        Обновить
+                    </button>
+                </div>
+
+                {loading ? (
+                    <div className="spinner-row">
+                        <div className="spinner" />
+                        <span>Загрузка заявок…</span>
+                    </div>
+                ) : requests.length === 0 ? (
+                    <p className="muted">Новых заявок нет.</p>
+                ) : (
+                    <table className="table">
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Логин</th>
+                            <th>Создан</th>
+                            <th style={{ width: 180 }} />
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {requests.map(u => (
+                            <tr key={u.id}>
+                                <td><code>{u.id}</code></td>
+                                <td>{u.username}</td>
+                                <td>{u.createdAt ? new Date(u.createdAt).toLocaleString('ru-RU') : '—'}</td>
+                                <td>
+                                    <div className="table-actions">
+                                        <button
+                                            className="btn primary small"
+                                            onClick={() => onApprove(u)}
+                                        >
+                                            Одобрить
+                                        </button>
+                                        <button
+                                            className="btn ghost small"
+                                            onClick={() => onReject(u)}
+                                        >
+                                            Отклонить
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
 
             {creating && (
                 <div className="card card-inline">
@@ -112,7 +215,10 @@ export default function UsersPage() {
                         />
                         <select
                             value={form.role}
-                            onChange={e => setForm(f => ({ ...f, role: e.target.value as any }))}
+                            onChange={e => setForm(f => ({
+                                ...f,
+                                role: e.target.value as NewUserForm['role'],
+                            }))}
                         >
                             <option value="USER">USER</option>
                             <option value="ADMIN">ADMIN</option>
@@ -137,7 +243,7 @@ export default function UsersPage() {
                         <div className="spinner" />
                         <span>Загрузка…</span>
                     </div>
-                ) : users.length === 0 ? (
+                ) : visibleUsers.length === 0 ? (
                     <p className="muted">Пользователей пока нет.</p>
                 ) : (
                     <table className="table">
@@ -146,12 +252,13 @@ export default function UsersPage() {
                             <th>ID</th>
                             <th>Логин</th>
                             <th>Роль</th>
+                            <th>Статус</th>
                             <th>Заблокирован с</th> {}
                             <th style={{ width: 140 }} />
                         </tr>
                         </thead>
                         <tbody>
-                        {users.map(u => (
+                        {visibleUsers.map(u => (
                             <tr key={u.id}>
                                 <td><code>{u.id}</code></td>
                                 <td>{u.username}</td>
@@ -159,6 +266,11 @@ export default function UsersPage() {
                     <span className={u.role === 'ADMIN' ? 'badge badge-admin' : 'badge'}>
                       {u.role}
                     </span>
+                                </td>
+                                <td>
+                                    <span className={`badge badge-status badge-${u.status.toLowerCase()}`}>
+                                        {u.status}
+                                    </span>
                                 </td>
                                 <td>
                                     {u.blockedAt
