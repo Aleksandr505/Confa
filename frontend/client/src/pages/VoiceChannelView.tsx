@@ -11,6 +11,7 @@ import '@livekit/components-styles';
 import { Track } from 'livekit-client';
 import { fetchChannelLivekitToken } from '../api';
 import Soundboard from '../components/Soundboard';
+import { getErrorMessage } from '../lib/errors';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 
@@ -41,8 +42,8 @@ export default function VoiceChannelView({ channelId, channelName }: VoiceChanne
             const t = await fetchChannelLivekitToken(channelId);
             setToken(t);
             setConnect(true);
-        } catch (e: any) {
-            setError(e?.message || 'Failed to join voice channel');
+        } catch (e: unknown) {
+            setError(getErrorMessage(e, 'Failed to join voice channel'));
         } finally {
             setLoading(false);
         }

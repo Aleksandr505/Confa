@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import '../styles/app-shell.css';
 import {
@@ -23,22 +23,8 @@ import {
     uploadMyAvatar,
 } from '../api';
 import { getUserIdentity } from '../lib/auth';
-
-type AppShellState = {
-    workspaces: WorkspaceDto[];
-    channels: ChannelDto[];
-    dms: DmSummary[];
-    activeWorkspace?: WorkspaceDto;
-    loadingWorkspaces: boolean;
-    loadingChannels: boolean;
-    loadingDms: boolean;
-    refreshWorkspaces: () => Promise<void>;
-    refreshDms: (silent?: boolean) => Promise<void>;
-    refreshWorkspaceChannels: (silent?: boolean) => Promise<void>;
-    openWorkspace: (workspaceId: number) => Promise<void>;
-};
-
-const AppShellContext = createContext<AppShellState | null>(null);
+import { AppShellContext } from './AppShellContext';
+import { getErrorMessage } from '../lib/errors';
 
 function slugify(value: string) {
     return value
@@ -64,12 +50,6 @@ function formatAvatarMeta(item: MyAvatarAssetDto): string {
     const size = item.originalSizeBytes ? `${Math.round(item.originalSizeBytes / 1024)} KB` : 'size n/a';
     const dims = item.width && item.height ? `${item.width}x${item.height}` : 'dims n/a';
     return `${dims} • ${size}`;
-}
-
-export function useAppShell() {
-    const ctx = useContext(AppShellContext);
-    if (!ctx) throw new Error('AppShellContext is not available');
-    return ctx;
 }
 
 export default function AppShellLayout() {
@@ -216,8 +196,8 @@ export default function AppShellLayout() {
             setWorkspaceName('');
             setWorkspaceSlug('');
             await openWorkspace(created.id);
-        } catch (e: any) {
-            setFormError(e?.message || 'Failed to create workspace.');
+        } catch (e: unknown) {
+            setFormError(getErrorMessage(e, 'Failed to create workspace.'));
         }
     };
 
@@ -244,8 +224,8 @@ export default function AppShellLayout() {
             setChannelName('');
             setChannelTopic('');
             navigate(`/app/w/${workspaceId}/ch/${created.id}`);
-        } catch (e: any) {
-            setFormError(e?.message || 'Failed to create channel.');
+        } catch (e: unknown) {
+            setFormError(getErrorMessage(e, 'Failed to create channel.'));
         }
     };
 
@@ -261,8 +241,8 @@ export default function AppShellLayout() {
                 maxUses: maxUses && maxUses > 0 ? maxUses : undefined,
             });
             setInviteLink(invite.inviteUrl || invite.token);
-        } catch (e: any) {
-            setFormError(e?.message || 'Failed to create invite.');
+        } catch (e: unknown) {
+            setFormError(getErrorMessage(e, 'Failed to create invite.'));
         } finally {
             setInviteBusy(false);
         }
@@ -292,8 +272,8 @@ export default function AppShellLayout() {
             if (activeUrl && myUserId) {
                 setWorkspaceUserAvatarById(prev => ({ ...prev, [myUserId]: activeUrl }));
             }
-        } catch (e: any) {
-            setProfileError(e?.message || 'Failed to load profile');
+        } catch (e: unknown) {
+            setProfileError(getErrorMessage(e, 'Failed to load profile'));
         } finally {
             setProfileLoading(false);
         }
@@ -315,8 +295,8 @@ export default function AppShellLayout() {
                 }
             }
             setAvatarMessage('Avatar uploaded');
-        } catch (e: any) {
-            setAvatarMessage(e?.message || 'Failed to upload avatar');
+        } catch (e: unknown) {
+            setAvatarMessage(getErrorMessage(e, 'Failed to upload avatar'));
         } finally {
             setAvatarBusy(false);
             if (avatarInputRef.current) avatarInputRef.current.value = '';
@@ -334,8 +314,8 @@ export default function AppShellLayout() {
                 setWorkspaceUserAvatarById(prev => ({ ...prev, [myUserId]: resolved }));
             }
             setAvatarMessage('Active avatar updated');
-        } catch (e: any) {
-            setAvatarMessage(e?.message || 'Failed to switch avatar');
+        } catch (e: unknown) {
+            setAvatarMessage(getErrorMessage(e, 'Failed to switch avatar'));
         } finally {
             setAvatarBusy(false);
         }
@@ -359,9 +339,9 @@ export default function AppShellLayout() {
     }, []);
 
     useEffect(() => {
-        refreshWorkspaces();
-        refreshDms();
-    }, []);
+        void refreshWorkspaces();
+        void refreshDms();
+    }, [refreshDms, refreshWorkspaces]);
 
     useEffect(() => {
         const timer = window.setInterval(() => {
@@ -577,7 +557,10 @@ export default function AppShellLayout() {
             loadingWorkspaces,
             loadingChannels,
             loadingDms,
+            refreshWorkspaces,
+            refreshDms,
             refreshWorkspaceChannels,
+            openWorkspace,
         ],
     );
 

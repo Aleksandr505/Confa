@@ -28,12 +28,15 @@ export function getAccessToken() {
 }
 
 
-function decodeJwtPayload(token: string): any | null {
+type JwtPayload = Record<string, unknown>;
+
+function decodeJwtPayload(token: string): JwtPayload | null {
     try {
         const [, payload] = token.split('.');
         if (!payload) return null;
         const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-        return JSON.parse(json);
+        const parsed = JSON.parse(json) as unknown;
+        return parsed && typeof parsed === 'object' ? parsed as JwtPayload : null;
     } catch {
         return null;
     }
@@ -54,7 +57,7 @@ export function getUserRoles(): string[] {
     if (!raw) return [];
 
     if (Array.isArray(raw)) {
-        return raw as string[];
+        return raw.filter((role): role is string => typeof role === 'string');
     }
 
     if (typeof raw === 'string') {
@@ -74,5 +77,6 @@ export function getUserIdentity(): string | null {
     if (!token) return null;
     const payload = decodeJwtPayload(token);
     if (!payload) return null;
-    return payload.sub || payload.user || payload.username || null;
+    const identity = payload.sub || payload.user || payload.username;
+    return typeof identity === 'string' ? identity : null;
 }

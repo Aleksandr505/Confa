@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import {useEffect, useState, createContext, useContext, type ReactNode,} from 'react';
+import {useEffect, useState, type ReactNode,} from 'react';
 import { getBootstrapStatus } from './api';
 import BootstrapPage from './pages/BootstrapPage';
 import LoginPage from './pages/LoginPage';
@@ -9,17 +9,6 @@ import AdminLayout from './components/AdminLayout';
 import { isAuthed } from './auth';
 
 type BootstrapState = 'loading' | 'needsBootstrap' | 'ready';
-
-const BootstrapContext = createContext<{
-    state: BootstrapState;
-    markReady: () => void;
-} | null>(null);
-
-function useBootstrap() {
-    const ctx = useContext(BootstrapContext);
-    if (!ctx) throw new Error('BootstrapContext not provided');
-    return ctx;
-}
 
 function BootstrapProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<BootstrapState>('loading');
@@ -36,11 +25,6 @@ function BootstrapProvider({ children }: { children: ReactNode }) {
         })();
     }, []);
 
-    const value = {
-        state,
-        markReady: () => setState('ready'),
-    };
-
     if (state === 'loading') {
         return (
             <div className="fullpage-center">
@@ -53,18 +37,10 @@ function BootstrapProvider({ children }: { children: ReactNode }) {
     }
 
     if (state === 'needsBootstrap') {
-        return (
-            <BootstrapContext.Provider value={value}>
-                <BootstrapPage />
-            </BootstrapContext.Provider>
-        );
+        return <BootstrapPage onReady={() => setState('ready')} />;
     }
 
-    return (
-        <BootstrapContext.Provider value={value}>
-            {children}
-        </BootstrapContext.Provider>
-    );
+    return <>{children}</>;
 }
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -102,5 +78,3 @@ export default function App() {
         </BootstrapProvider>
     );
 }
-
-export { useBootstrap };

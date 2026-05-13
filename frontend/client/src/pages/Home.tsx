@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     activateMyAvatar,
@@ -13,6 +13,7 @@ import {
     uploadMyAvatar,
 } from '../api';
 import { getUserIdentity } from '../lib/auth';
+import { getErrorMessage } from '../lib/errors';
 import '../styles/login.css';
 import '../styles/home.css';
 
@@ -85,7 +86,7 @@ export default function HomePage() {
         };
     }, [profileOpen]);
 
-    const loadRoomOrder = () => {
+    const loadRoomOrder = useCallback(() => {
         try {
             const raw = localStorage.getItem('confa:roomLastVisited');
             return raw ? (JSON.parse(raw) as Record<string, number>) : {};
@@ -93,9 +94,9 @@ export default function HomePage() {
             console.warn('Failed to load room order', e);
             return {};
         }
-    };
+    }, []);
 
-    const storeRoomVisit = (name: string) => {
+    const storeRoomVisit = useCallback((name: string) => {
         try {
             const order = loadRoomOrder();
             order[name] = Date.now();
@@ -103,13 +104,9 @@ export default function HomePage() {
         } catch (e) {
             console.warn('Failed to store room order', e);
         }
-    };
+    }, [loadRoomOrder]);
 
-    useEffect(() => {
-        loadRooms();
-    }, []);
-
-    async function loadRooms() {
+    const loadRooms = useCallback(async () => {
         setLoading(true);
         setErr(null);
         try {
@@ -125,12 +122,16 @@ export default function HomePage() {
             if (list.length === 0) {
                 setRoomName('');
             }
-        } catch (e: any) {
-            setErr(e?.message || 'Не удалось получить список комнат');
+        } catch (e: unknown) {
+            setErr(getErrorMessage(e, 'Не удалось получить список комнат'));
         } finally {
             setLoading(false);
         }
-    }
+    }, [loadRoomOrder]);
+
+    useEffect(() => {
+        void loadRooms();
+    }, [loadRooms]);
 
     async function onCreateRoom(e: FormEvent) {
         e.preventDefault();
@@ -151,10 +152,11 @@ export default function HomePage() {
             storeRoomVisit(room.name);
             setRooms(prev => [summary, ...prev.filter(r => r.id !== room.id)]);
             nav(`/room/${encodeURIComponent(room.name)}`);
-        } catch (e: any) {
-            const message = typeof e?.message === 'string' && e.message.startsWith('409')
+        } catch (e: unknown) {
+            const rawMessage = getErrorMessage(e, 'Не удалось создать комнату');
+            const message = rawMessage.startsWith('409')
                 ? 'Такая комната уже существует. Выберите другое имя или попросите инвайт.'
-                : e?.message || 'Не удалось создать комнату';
+                : rawMessage;
             setErr(message);
         } finally {
             setCreating(false);
@@ -171,8 +173,8 @@ export default function HomePage() {
             if (resolved) setCurrentAvatarUrl(resolved);
             await loadProfileCard();
             setAvatarMessage('Аватар обновлён');
-        } catch (e: any) {
-            setAvatarMessage(e?.message || 'Не удалось загрузить аватар');
+        } catch (e: unknown) {
+            setAvatarMessage(getErrorMessage(e, 'Не удалось загрузить аватар'));
         } finally {
             setAvatarBusy(false);
             if (avatarInputRef.current) {
@@ -194,8 +196,8 @@ export default function HomePage() {
             const active = avatarItems.find(item => item.activeGlobal);
             const activeUrl = toAbsoluteAvatarUrl(active?.contentUrl);
             if (activeUrl) setCurrentAvatarUrl(activeUrl);
-        } catch (e: any) {
-            setProfileError(e?.message || 'Не удалось загрузить профиль');
+        } catch (e: unknown) {
+            setProfileError(getErrorMessage(e, 'Не удалось загрузить профиль'));
         } finally {
             setProfileLoading(false);
         }
@@ -210,8 +212,8 @@ export default function HomePage() {
             if (resolved) setCurrentAvatarUrl(resolved);
             await loadProfileCard();
             setAvatarMessage('Активная аватарка обновлена');
-        } catch (e: any) {
-            setAvatarMessage(e?.message || 'Не удалось переключить аватар');
+        } catch (e: unknown) {
+            setAvatarMessage(getErrorMessage(e, 'Не удалось переключить аватар'));
         } finally {
             setAvatarBusy(false);
         }

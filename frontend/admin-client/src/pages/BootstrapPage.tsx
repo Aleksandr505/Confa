@@ -1,10 +1,13 @@
 import {type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createFirstAdmin } from '../api';
-import { useBootstrap } from '../App';
+import { getErrorMessage } from '../lib/errors';
 
-export default function BootstrapPage() {
-    const { markReady } = useBootstrap();
+type BootstrapPageProps = {
+    onReady: () => void;
+};
+
+export default function BootstrapPage({ onReady }: BootstrapPageProps) {
     const nav = useNavigate();
 
     const [serviceKey, setServiceKey] = useState('');
@@ -21,15 +24,15 @@ export default function BootstrapPage() {
         try {
             const res = await createFirstAdmin({ serviceKey, username });
             setResult(res);
-        } catch (e: any) {
-            setErr(e?.message || 'Ошибка при создании админа');
+        } catch (e: unknown) {
+            setErr(getErrorMessage(e, 'Ошибка при создании админа'));
         } finally {
             setLoading(false);
         }
     }
 
     function goToLogin() {
-        markReady();
+        onReady();
         nav('/login', { replace: true });
     }
 

@@ -62,6 +62,7 @@ import { getUserIdentity, isAdmin } from '../lib/auth.ts';
 import { getAvatarColor, getAvatarUrl, setAvatarUrlOverride } from '../lib/avatar';
 import { ParticipantEvent, RoomEvent, Track } from 'livekit-client';
 import Soundboard from '../components/Soundboard';
+import { getErrorMessage } from '../lib/errors';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 let presenceToneAudioCtx: AudioContext | null = null;
@@ -160,6 +161,16 @@ type RoomPageProps = {
     hideChat?: boolean;
     onExit?: () => void;
 };
+
+type PreJoinSubmitValues = Partial<Choices>;
+
+type AudioTrackWithVolume = {
+    setVolume: (volume: number) => void;
+};
+
+function hasSetVolume(track: unknown): track is AudioTrackWithVolume {
+    return !!track && typeof (track as { setVolume?: unknown }).setVolume === 'function';
+}
 
 export default function RoomPage({ roomName, channelId, embedded, hideChat, onExit }: RoomPageProps = {}) {
     const { roomId } = useParams();
@@ -267,9 +278,9 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
 
         fetchRoomMetadata(resolvedRoomId)
             .then(cfg => setRoomConfig(cfg))
-            .catch(e => {
+            .catch((e: unknown) => {
                 console.warn('Failed to load room config', e);
-                setRoomConfigError(e?.message || 'Не удалось получить конфиг комнаты');
+                setRoomConfigError(getErrorMessage(e, 'Не удалось получить конфиг комнаты'));
             })
             .finally(() => setRoomConfigLoading(false));
     }, [ready, resolvedRoomId]);
@@ -286,9 +297,9 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
                     ? await fetchChannelLivekitToken(channelId)
                     : await fetchLivekitToken(resolvedRoomId, displayName);
                 if (!cancelled) setToken(t);
-            } catch (e: any) {
+            } catch (e: unknown) {
                 if (!cancelled) {
-                    const raw = e?.message || 'Token error';
+                    const raw = getErrorMessage(e, 'Token error');
                     const friendly = raw.startsWith('403')
                         ? 'Нет доступа к этой комнате. Попросите владельца выдать приглашение.'
                         : raw;
@@ -299,7 +310,7 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
         return () => {
             cancelled = true;
         };
-    }, [ready, resolvedRoomId, choices?.username]);
+    }, [channelId, ready, resolvedRoomId, choices?.username]);
 
     const audioProp = useMemo(() => {
         if (!choices?.audioEnabled) return false;
@@ -327,8 +338,8 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
                 ) {
                     setSelectedAgentId(list[0]?.identity);
                 }
-            } catch (e: any) {
-                setAgentsError(e?.message || 'Не удалось загрузить агентов');
+            } catch (e: unknown) {
+                setAgentsError(getErrorMessage(e, 'Не удалось загрузить агентов'));
             } finally {
                 if (!silent) setAgentsLoading(false);
             }
@@ -361,8 +372,8 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
             await enableRoomAgents(resolvedRoomId);
             const cfg = await fetchRoomMetadata(resolvedRoomId);
             setRoomConfig(cfg);
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось включить агентов');
+        } catch (e: unknown) {
+            alert(getErrorMessage(e, 'Не удалось включить агентов'));
         }
     }
 
@@ -375,8 +386,8 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
             await disableRoomAgents(resolvedRoomId);
             const cfg = await fetchRoomMetadata(resolvedRoomId);
             setRoomConfig(cfg);
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось отключить агентов');
+        } catch (e: unknown) {
+            alert(getErrorMessage(e, 'Не удалось отключить агентов'));
         }
     }
 
@@ -388,8 +399,8 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
         try {
             const invite = await createInvite(resolvedRoomId, {});
             setInviteInfo(invite);
-        } catch (e: any) {
-            setInviteError(e?.message || 'Не удалось создать приглашение');
+        } catch (e: unknown) {
+            setInviteError(getErrorMessage(e, 'Не удалось создать приглашение'));
         } finally {
             setInviteBusy(false);
         }
@@ -402,8 +413,8 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
             await navigator.clipboard.writeText(value);
             setInviteCopied(true);
             setTimeout(() => setInviteCopied(false), 1500);
-        } catch (e: any) {
-            setInviteError(e?.message || 'Не удалось скопировать приглашение');
+        } catch (e: unknown) {
+            setInviteError(getErrorMessage(e, 'Не удалось скопировать приглашение'));
         }
     }
 
@@ -413,8 +424,8 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
         try {
             await inviteAgent(resolvedRoomId, role);
             await loadAgents();
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось пригласить агента');
+        } catch (e: unknown) {
+            alert(getErrorMessage(e, 'Не удалось пригласить агента'));
         } finally {
             setInviteLoading(false);
         }
@@ -426,8 +437,8 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
         try {
             await kickAgent(resolvedRoomId, { agentIdentity: selectedAgentId });
             await loadAgents();
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось выгнать агента');
+        } catch (e: unknown) {
+            alert(getErrorMessage(e, 'Не удалось выгнать агента'));
         }
     }
 
@@ -438,8 +449,8 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
         try {
             await muteAgent(resolvedRoomId, agent.sid, !agent.muted);
             await loadAgents();
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось изменить mute для агента');
+        } catch (e: unknown) {
+            alert(getErrorMessage(e, 'Не удалось изменить mute для агента'));
         }
     }
 
@@ -456,8 +467,8 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
                 userIdentity,
             });
             alert('Агенту отправлен сигнал сфокусироваться на вас');
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось сфокусировать агента');
+        } catch (e: unknown) {
+            alert(getErrorMessage(e, 'Не удалось сфокусировать агента'));
         }
     }
 
@@ -486,7 +497,7 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
                             userLabel="Ваше имя"
                             micLabel="Микрофон"
                             camLabel="Камера"
-                            onSubmit={(values: any) => {
+                            onSubmit={(values: PreJoinSubmitValues) => {
                                 setChoices({
                                     username: values?.username,
                                     audioEnabled: !!values?.audioEnabled,
@@ -497,7 +508,7 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
                                 setReady(true);
                             }}
                             onError={e => {
-                                setPrejoinError(e?.message || 'Permission or device error');
+                                setPrejoinError(getErrorMessage(e, 'Permission or device error'));
                             }}
                         />
                         <p className="hint">
@@ -558,8 +569,10 @@ export default function RoomPage({ roomName, channelId, embedded, hideChat, onEx
                         camera: isCam || undefined,
                         microphone: isMic || undefined,
                         message:
-                            (failure as any)?.message ||
-                            'Permission denied: браузер заблокировал доступ к устройствам',
+                            getErrorMessage(
+                                failure,
+                                'Permission denied: браузер заблокировал доступ к устройствам',
+                            ),
                     });
                     console.warn('Media device failure', failure, kind);
                 }}
@@ -949,7 +962,7 @@ function VolumesPanel({
             }
         }
         if (changed) setVolumes(next);
-    }, [participants, volumes]);
+    }, [participants, setVolumes, volumes]);
 
     useEffect(() => {
         let changed = false;
@@ -959,8 +972,8 @@ function VolumesPanel({
             if (next[identity] === undefined) {
                 next[identity] = 0.5;
                 const audioTrack = track.publication?.track;
-                if (audioTrack && audioTrack.kind === Track.Kind.Audio && typeof (audioTrack as any).setVolume === 'function') {
-                    (audioTrack as any).setVolume(0.5);
+                if (audioTrack?.kind === Track.Kind.Audio && hasSetVolume(audioTrack)) {
+                    audioTrack.setVolume(0.5);
                 }
                 changed = true;
             }
@@ -976,9 +989,9 @@ function VolumesPanel({
                 volume !== undefined &&
                 audioTrack &&
                 audioTrack.kind === Track.Kind.Audio &&
-                typeof (audioTrack as any).setVolume === 'function'
+                hasSetVolume(audioTrack)
             ) {
-                (audioTrack as any).setVolume(volume);
+                audioTrack.setVolume(volume);
             }
         }
     }, [screenShareAudioTracks, screenShareVolumes]);
@@ -1071,9 +1084,9 @@ function VolumesPanel({
                                                 if (
                                                     audioTrack &&
                                                     audioTrack.kind === Track.Kind.Audio &&
-                                                    typeof (audioTrack as any).setVolume === 'function'
+                                                    hasSetVolume(audioTrack)
                                                 ) {
-                                                    (audioTrack as any).setVolume(next);
+                                                    audioTrack.setVolume(next);
                                                 }
                                             }}
                                         />
@@ -1648,7 +1661,7 @@ function PermissionBanner({
 
             if (what !== 'cam') await room.localParticipant.setMicrophoneEnabled(true);
             if (what !== 'mic') await room.localParticipant.setCameraEnabled(true);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.warn('Re-request media failed', e);
             alert(
                 'Доступ всё ещё заблокирован. Откройте настройки сайта (иконка камеры/микрофона рядом с адресной строкой) и разрешите доступ, затем попробуйте снова.',

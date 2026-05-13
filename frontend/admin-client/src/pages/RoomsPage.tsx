@@ -8,6 +8,7 @@ import {
     type ParticipantInfoDto,
     type RoomSummaryDto,
 } from '../api';
+import { getErrorMessage } from '../lib/errors';
 
 type FilterMode = 'all' | 'agents' | 'users';
 
@@ -36,11 +37,9 @@ export default function RoomsPage() {
             try {
                 const data = await fetchActiveRooms();
                 setRooms(data);
-                if (data.length > 0 && !selectedRoom) {
-                    setSelectedRoom(data[0].name);
-                }
-            } catch (e: any) {
-                setErr(e?.message || 'Не удалось получить список комнат');
+                setSelectedRoom(prev => prev ?? data[0]?.name ?? null);
+            } catch (e: unknown) {
+                setErr(getErrorMessage(e, 'Не удалось получить список комнат'));
             } finally {
                 setRoomsLoading(false);
             }
@@ -60,8 +59,8 @@ export default function RoomsPage() {
                 ]);
                 setParticipants(p);
                 setAgents(a);
-            } catch (e: any) {
-                setErr(e?.message || 'Не удалось получить участников комнаты');
+            } catch (e: unknown) {
+                setErr(getErrorMessage(e, 'Не удалось получить участников комнаты'));
             } finally {
                 setListLoading(false);
             }
@@ -107,8 +106,8 @@ export default function RoomsPage() {
             ]);
             setParticipants(p);
             setAgents(a);
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось выгнать агента');
+        } catch (e: unknown) {
+            alert(getErrorMessage(e, 'Не удалось выгнать агента'));
         }
     }
 

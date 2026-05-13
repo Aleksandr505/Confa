@@ -1,6 +1,13 @@
 import {type FormEvent, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { loginAdmin } from '../api';
+import { getErrorMessage } from '../lib/errors';
+
+type LoginLocationState = {
+    from?: {
+        pathname?: string;
+    };
+};
 
 export default function LoginPage() {
     const [username, setU] = useState('');
@@ -8,8 +15,9 @@ export default function LoginPage() {
     const [err, setErr] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const nav = useNavigate();
-    const location = useLocation() as any;
-    const from = location.state?.from?.pathname || '/';
+    const location = useLocation();
+    const locationState = location.state as LoginLocationState | null;
+    const from = locationState?.from?.pathname || '/';
 
     async function onSubmit(e: FormEvent) {
         e.preventDefault();
@@ -18,8 +26,8 @@ export default function LoginPage() {
         try {
             await loginAdmin(username, password);
             nav(from, { replace: true });
-        } catch (e: any) {
-            setErr(e?.message || 'Ошибка авторизации');
+        } catch (e: unknown) {
+            setErr(getErrorMessage(e, 'Ошибка авторизации'));
         } finally {
             setLoading(false);
         }

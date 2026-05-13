@@ -66,7 +66,7 @@ export async function http<T>(path: string, init: RequestInit = {}): Promise<T> 
 
     try {
         return JSON.parse(raw) as T;
-    } catch (e) {
+    } catch {
         throw new Error('Failed to parse JSON response');
     }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppShell } from './AppShell';
+import { useAppShell } from './AppShellContext';
 
 export default function AppHomePage() {
     const { workspaces, channels, loadingWorkspaces, openWorkspace } = useAppShell();

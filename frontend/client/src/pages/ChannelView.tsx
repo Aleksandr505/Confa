@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAppShell } from './AppShell';
+import { useAppShell } from './AppShellContext';
 import {
     type MessageDto,
     addMessageReaction,
@@ -14,6 +14,7 @@ import {
 import { getUserIdentity } from '../lib/auth';
 import VoiceChannelView from './VoiceChannelView';
 import MessageTimeline from '../components/MessageTimeline';
+import { getErrorMessage } from '../lib/errors';
 
 export default function ChannelViewPage() {
     const { channelId } = useParams();
@@ -84,9 +85,9 @@ export default function ChannelViewPage() {
                 if (!active) return;
                 const items = page.items.slice().reverse();
                 setMessages(prev => mergeById(prev, items));
-            } catch (e: any) {
+            } catch (e: unknown) {
                 if (!silent && active) {
-                    setError(e?.message || 'Failed to load messages');
+                    setError(getErrorMessage(e, 'Failed to load messages'));
                 }
             } finally {
                 if (!silent && active) setLoading(false);
@@ -235,8 +236,8 @@ export default function ChannelViewPage() {
             const msg = await createChannelMessage(currentChannelId, trimmed, replyTo?.id);
             setMessages(prev => [...prev, msg]);
             setReplyTo(null);
-        } catch (e: any) {
-            setError(e?.message || 'Failed to send message');
+        } catch (e: unknown) {
+            setError(getErrorMessage(e, 'Failed to send message'));
         }
     }
 

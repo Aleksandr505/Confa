@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { RoomEvent } from 'livekit-client';
 import {
@@ -12,6 +12,7 @@ import {
     type SoundClipDto,
 } from '../api';
 import { isAdmin } from '../lib/auth';
+import { getErrorMessage } from '../lib/errors';
 
 type Props = {
     roomName?: string;
@@ -56,11 +57,6 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
     const playbackVolumeRef = useRef(0.95);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const isAdminUser = isAdmin();
-
-    useEffect(() => {
-        if (!open || !resolvedRoomName) return;
-        void refresh();
-    }, [open, resolvedRoomName]);
 
     useEffect(() => {
         const normalized = clampPercentToUnit(playbackVolumePct);
@@ -110,7 +106,7 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
         };
     }, [open]);
 
-    async function refresh() {
+    const refresh = useCallback(async () => {
         if (!resolvedRoomName) return;
         setLoading(true);
         setError(null);
@@ -121,12 +117,17 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
             ]);
             setRoomClips(normalizeClips(roomPayload));
             setAvailableClips(normalizeClips(availablePayload));
-        } catch (e: any) {
-            setError(e?.message || 'Не удалось загрузить soundboard');
+        } catch (e: unknown) {
+            setError(getErrorMessage(e, 'Не удалось загрузить soundboard'));
         } finally {
             setLoading(false);
         }
-    }
+    }, [resolvedRoomName]);
+
+    useEffect(() => {
+        if (!open || !resolvedRoomName) return;
+        void refresh();
+    }, [open, refresh, resolvedRoomName]);
 
     async function playClip(clip: SoundClipDto) {
         if (!resolvedRoomName) return;
@@ -136,8 +137,8 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
         }
         try {
             await playSoundClip(clip.id, resolvedRoomName);
-        } catch (e: any) {
-            setError(e?.message || 'Не удалось проиграть звук');
+        } catch (e: unknown) {
+            setError(getErrorMessage(e, 'Не удалось проиграть звук'));
         }
     }
 
@@ -145,8 +146,8 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
         if (!resolvedRoomName) return;
         try {
             await stopSoundboard(resolvedRoomName);
-        } catch (e: any) {
-            setError(e?.message || 'Не удалось остановить звук');
+        } catch (e: unknown) {
+            setError(getErrorMessage(e, 'Не удалось остановить звук'));
         }
     }
 
@@ -156,8 +157,8 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
         try {
             await uploadSoundClip(file, { roomName: resolvedRoomName });
             await refresh();
-        } catch (e: any) {
-            setError(e?.message || 'Не удалось загрузить звук');
+        } catch (e: unknown) {
+            setError(getErrorMessage(e, 'Не удалось загрузить звук'));
         } finally {
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
@@ -169,8 +170,8 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
             await shareSoundClip(clip.id, resolvedRoomName);
             await refresh();
             setTab('room');
-        } catch (e: any) {
-            setError(e?.message || 'Не удалось поделиться звуком');
+        } catch (e: unknown) {
+            setError(getErrorMessage(e, 'Не удалось поделиться звуком'));
         }
     }
 
@@ -178,8 +179,8 @@ export default function Soundboard({ roomName, triggerClassName, audioOff = fals
         try {
             await deleteSoundClip(clip.id);
             await refresh();
-        } catch (e: any) {
-            setError(e?.message || 'Не удалось удалить звук');
+        } catch (e: unknown) {
+            setError(getErrorMessage(e, 'Не удалось удалить звук'));
         }
     }
 
@@ -386,8 +387,11 @@ function normalizeClips(payload: unknown): SoundClipDto[] {
     if (Array.isArray(payload)) {
         return sortByNewest(payload as SoundClipDto[]);
     }
-    if (payload && typeof payload === 'object' && Array.isArray((payload as any).items)) {
-        return sortByNewest((payload as any).items as SoundClipDto[]);
+    if (payload && typeof payload === 'object' && 'items' in payload) {
+        const items = (payload as { items?: unknown }).items;
+        if (Array.isArray(items)) {
+            return sortByNewest(items as SoundClipDto[]);
+        }
     }
     return [];
 }
