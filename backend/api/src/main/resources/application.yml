@@ -54,3 +54,15 @@ avatar:
     access-key: ${AVATAR_S3_ACCESS_KEY:minioadmin}
     secret-key: ${AVATAR_S3_SECRET_KEY:minioadmin}
     path-style: ${AVATAR_S3_PATH_STYLE:true}
+
+attachment:
+  image:
+    max-raw-upload-bytes: ${ATTACHMENT_IMAGE_MAX_RAW_UPLOAD_BYTES:5242880}
+    max-raw-edge: ${ATTACHMENT_IMAGE_MAX_RAW_EDGE:4096}
+    max-raw-pixels: ${ATTACHMENT_IMAGE_MAX_RAW_PIXELS:16000000}
+    max-display-edge: ${ATTACHMENT_IMAGE_MAX_DISPLAY_EDGE:1280}
+    max-display-bytes: ${ATTACHMENT_IMAGE_MAX_DISPLAY_BYTES:512000}
+    max-thumbnail-edge: ${ATTACHMENT_IMAGE_MAX_THUMBNAIL_EDGE:320}
+    max-thumbnail-bytes: ${ATTACHMENT_IMAGE_MAX_THUMBNAIL_BYTES:81920}
+    max-attachments-per-message: ${ATTACHMENT_IMAGE_MAX_ATTACHMENTS_PER_MESSAGE:1}
+    presign-ttl-seconds: ${ATTACHMENT_IMAGE_PRESIGN_TTL_SECONDS:900}

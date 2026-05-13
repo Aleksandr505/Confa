@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { MessageDto } from '../api';
+import type { MessageAttachmentDto, MessageDto } from '../api';
 
 type MessageTimelineProps = {
     messages: MessageDto[];
@@ -80,6 +80,7 @@ export default function MessageTimeline({
     onToggleReaction,
 }: MessageTimelineProps) {
     const [openReactionPickerFor, setOpenReactionPickerFor] = useState<number | null>(null);
+    const [openImage, setOpenImage] = useState<MessageAttachmentDto | null>(null);
 
     function myReactionCount(message: MessageDto): number {
         return message.reactions?.filter(reaction => reaction.reactedByMe).length ?? 0;
@@ -139,7 +140,8 @@ export default function MessageTimeline({
                                             className="message-avatar"
                                             type="button"
                                             onClick={() => onAvatarClick?.(senderId)}
-                                            title="Open DM"
+                                            disabled={!onAvatarClick}
+                                            title={onAvatarClick ? 'Open DM' : undefined}
                                             style={avatarUrl ? { backgroundImage: `url(${avatarUrl})` } : undefined}
                                         >
                                             {!avatarUrl ? fallback : null}
@@ -173,16 +175,35 @@ export default function MessageTimeline({
                                                 {msg.replyToSenderUsername || 'Unknown'}
                                             </span>
                                             <span className="channel-message-reply-body">
-                                                {msg.replyToBody || 'Original message unavailable'}
+                                                {msg.replyToBody || 'Image'}
                                             </span>
                                         </div>
                                     )}
-                                    <span>{msg.body}</span>
+                                    {msg.body?.trim() ? <span>{msg.body}</span> : null}
+                                    {!!msg.attachments?.length && (
+                                        <div className="channel-message-attachments">
+                                            {msg.attachments.map(attachment => (
+                                                <button
+                                                    key={attachment.id}
+                                                    type="button"
+                                                    className="channel-message-attachment"
+                                                    onClick={() => setOpenImage(attachment)}
+                                                >
+                                                    <img
+                                                        src={attachment.thumbnailUrl || attachment.displayUrl}
+                                                        alt={attachmentAlt(attachment)}
+                                                        loading="lazy"
+                                                    />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                     <span className="channel-message-inline-time">{timeLabel}</span>
                                     <div className="channel-message-actions">
                                         <button
                                             type="button"
                                             className="channel-message-action-btn"
+                                            disabled={!msg.body?.trim()}
                                             onClick={() => copyMessage(msg.body)}
                                         >
                                             Copy
@@ -265,6 +286,31 @@ export default function MessageTimeline({
                     </div>
                 );
             })}
+            {openImage && (
+                <div
+                    className="message-image-lightbox"
+                    role="dialog"
+                    aria-modal="true"
+                    onClick={() => setOpenImage(null)}
+                >
+                    <button
+                        type="button"
+                        className="message-image-lightbox__close"
+                        onClick={() => setOpenImage(null)}
+                    >
+                        Close
+                    </button>
+                    <img
+                        src={openImage.displayUrl}
+                        alt={attachmentAlt(openImage)}
+                        onClick={event => event.stopPropagation()}
+                    />
+                </div>
+            )}
         </div>
     );
+}
+
+function attachmentAlt(attachment: MessageAttachmentDto): string {
+    return attachment.originalFilename || 'Image attachment';
 }

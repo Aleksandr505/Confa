@@ -120,11 +120,21 @@ public class RoomAccessService {
     }
 
     public Mono<Void> checkUserCanJoin(Long userId, String roomName) {
+        return getRoomForAccess(userId, roomName).then();
+    }
+
+    public Mono<RoomEntity> getRoomForAccess(Long userId, String roomName) {
         return roomRepository.findByName(roomName)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found")))
                 .flatMap(room -> roomMemberRepository.findByRoomIdAndUserId(room.getId(), userId)
                         .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "No access to room")))
-                        .then());
+                        .thenReturn(room));
+    }
+
+    public Mono<Void> checkUserCanJoinRoomId(Long userId, Long roomId) {
+        return roomMemberRepository.findByRoomIdAndUserId(roomId, userId)
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "No access to room")))
+                .then();
     }
 
     @Transactional

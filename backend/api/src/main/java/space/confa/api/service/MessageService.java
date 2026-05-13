@@ -12,6 +12,7 @@ import space.confa.api.infrastructure.db.repository.MessageRepository;
 import space.confa.api.model.domain.MessageKind;
 import space.confa.api.model.dto.request.CreateMessageDto;
 import space.confa.api.model.dto.request.UpdateMessageDto;
+import space.confa.api.model.dto.response.MessageAttachmentDto;
 import space.confa.api.model.dto.response.MessageDto;
 import space.confa.api.model.dto.response.MessagePageDto;
 import space.confa.api.model.dto.response.MessageReactionDto;
@@ -34,30 +35,68 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final MessengerAccessService messengerAccessService;
+    private final RoomAccessService roomAccessService;
+    private final MessageAttachmentService messageAttachmentService;
     private final DatabaseClient databaseClient;
 
     public Mono<MessagePageDto> getMessages(Long userId, Long channelId, Long cursor, Integer limit) {
         int safeLimit = limit == null ? DEFAULT_LIMIT : Math.min(limit, MAX_LIMIT);
 
         return messengerAccessService.getChannelForAccess(userId, channelId)
-                .thenMany(fetchMessages(channelId, cursor, safeLimit))
+                .thenMany(fetchChannelMessages(channelId, cursor, safeLimit))
                 .collectList()
-                .flatMap(items -> enrichWithReactions(userId, items)
+                .flatMap(items -> enrichMessages(userId, items)
+                        .map(enriched -> new MessagePageDto(enriched, nextCursor(enriched))));
+    }
+
+    public Mono<MessagePageDto> getRoomMessages(Long userId, String roomName, Long cursor, Integer limit) {
+        int safeLimit = limit == null ? DEFAULT_LIMIT : Math.min(limit, MAX_LIMIT);
+
+        return roomAccessService.getRoomForAccess(userId, roomName)
+                .flatMapMany(room -> fetchRoomMessages(room.getId(), cursor, safeLimit))
+                .collectList()
+                .flatMap(items -> enrichMessages(userId, items)
                         .map(enriched -> new MessagePageDto(enriched, nextCursor(enriched))));
     }
 
     @Transactional
     public Mono<MessageDto> createMessage(Long userId, Long channelId, CreateMessageDto dto) {
+        String body = normalizeBody(dto);
+        List<Long> attachmentIds = normalizeAttachmentIds(dto);
+        validateMessageContent(body, attachmentIds);
+
         return messengerAccessService.getChannelForAccess(userId, channelId)
-                .then(validateReplyTarget(channelId, dto.replyToMessageId()))
+                .then(validateReplyTarget(channelId, null, dto.replyToMessageId()))
                 .then(messageRepository.save(MessageEntity.builder()
                         .channelId(channelId)
                         .senderUserId(userId)
                         .kind(MessageKind.USER)
-                        .body(dto.body().trim())
+                        .body(body)
                         .replyToMessageId(dto.replyToMessageId())
                         .build()))
-                .flatMap(saved -> fetchMessageById(userId, saved.getId()));
+                .flatMap(saved -> messageAttachmentService
+                        .attachPendingToMessage(userId, saved.getId(), channelId, null, attachmentIds)
+                        .then(fetchMessageById(userId, saved.getId())));
+    }
+
+    @Transactional
+    public Mono<MessageDto> createRoomMessage(Long userId, String roomName, CreateMessageDto dto) {
+        String body = normalizeBody(dto);
+        List<Long> attachmentIds = normalizeAttachmentIds(dto);
+        validateMessageContent(body, attachmentIds);
+
+        return roomAccessService.getRoomForAccess(userId, roomName)
+                .flatMap(room -> validateReplyTarget(null, room.getId(), dto.replyToMessageId())
+                        .then(messageRepository.save(MessageEntity.builder()
+                                .roomId(room.getId())
+                                .senderUserId(userId)
+                                .kind(MessageKind.USER)
+                                .body(body)
+                                .replyToMessageId(dto.replyToMessageId())
+                                .build()))
+                        .flatMap(saved -> messageAttachmentService
+                                .attachPendingToMessage(userId, saved.getId(), null, room.getId(), attachmentIds)
+                                .then(fetchMessageById(userId, saved.getId()))));
     }
 
     @Transactional
@@ -85,16 +124,17 @@ public class MessageService {
                         return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN, "No access to message"));
                     }
                     return messageRepository.save(message.toBuilder()
-                            .deletedAt(Instant.now())
-                            .deletedByUserId(userId)
-                            .build()).then();
+                                    .deletedAt(Instant.now())
+                                    .deletedByUserId(userId)
+                                    .build())
+                            .then(messageAttachmentService.markMessageAttachmentsDeleted(messageId));
                 });
     }
 
     public Mono<List<MessageReactionDto>> getMessageReactions(Long userId, Long messageId) {
         return messageRepository.findById(messageId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found")))
-                .flatMap(message -> messengerAccessService.getChannelForAccess(userId, message.getChannelId())
+                .flatMap(message -> ensureMessageAccess(userId, message)
                         .then(fetchReactionsForMessages(userId, List.of(messageId))))
                 .map(map -> map.getOrDefault(messageId, List.of()));
     }
@@ -104,7 +144,7 @@ public class MessageService {
         String emoji = normalizeEmoji(rawEmoji);
         return messageRepository.findById(messageId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found")))
-                .flatMap(message -> messengerAccessService.getChannelForAccess(userId, message.getChannelId())
+                .flatMap(message -> ensureMessageAccess(userId, message)
                         .then(databaseClient.sql("""
                                 INSERT IGNORE INTO message_reaction (message_id, user_id, emoji)
                                 VALUES (:messageId, :userId, :emoji)
@@ -123,7 +163,7 @@ public class MessageService {
         String emoji = normalizeEmoji(rawEmoji);
         return messageRepository.findById(messageId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found")))
-                .flatMap(message -> messengerAccessService.getChannelForAccess(userId, message.getChannelId())
+                .flatMap(message -> ensureMessageAccess(userId, message)
                         .then(databaseClient.sql("""
                                 DELETE FROM message_reaction
                                 WHERE message_id = :messageId AND user_id = :userId AND emoji = :emoji
@@ -137,63 +177,45 @@ public class MessageService {
                 .then(getMessageReactions(userId, messageId));
     }
 
-    private Flux<MessageDto> fetchMessages(Long channelId, Long cursor, int limit) {
-        String sql;
-        DatabaseClient.GenericExecuteSpec spec;
+    private Flux<MessageDto> fetchChannelMessages(Long channelId, Long cursor, int limit) {
+        return fetchMessages("m.channel_id = :scopeId", channelId, cursor, limit);
+    }
 
-        if (cursor == null) {
-            sql = """
-                    SELECT m.id,
-                           m.channel_id,
-                           m.sender_user_id,
-                           u.username as sender_username,
-                           m.kind,
-                           m.body,
-                           m.reply_to_message_id,
-                           rm.body as reply_to_body,
-                           ru.username as reply_to_sender_username,
-                           m.created_at,
-                           m.edited_at,
-                           m.deleted_at
-                    FROM message m
-                    LEFT JOIN user u ON u.id = m.sender_user_id
-                    LEFT JOIN message rm ON rm.id = m.reply_to_message_id
-                    LEFT JOIN user ru ON ru.id = rm.sender_user_id
-                    WHERE m.channel_id = :channelId
-                    ORDER BY m.id DESC
-                    LIMIT :limit
-                    """;
-            spec = databaseClient.sql(sql)
-                    .bind("channelId", channelId)
-                    .bind("limit", limit);
-        } else {
-            sql = """
-                    SELECT m.id,
-                           m.channel_id,
-                           m.sender_user_id,
-                           u.username as sender_username,
-                           m.kind,
-                           m.body,
-                           m.reply_to_message_id,
-                           rm.body as reply_to_body,
-                           ru.username as reply_to_sender_username,
-                           m.created_at,
-                           m.edited_at,
-                           m.deleted_at
-                    FROM message m
-                    LEFT JOIN user u ON u.id = m.sender_user_id
-                    LEFT JOIN message rm ON rm.id = m.reply_to_message_id
-                    LEFT JOIN user ru ON ru.id = rm.sender_user_id
-                    WHERE m.channel_id = :channelId AND m.id < :cursor
-                    ORDER BY m.id DESC
-                    LIMIT :limit
-                    """;
-            spec = databaseClient.sql(sql)
-                    .bind("channelId", channelId)
-                    .bind("cursor", cursor)
-                    .bind("limit", limit);
+    private Flux<MessageDto> fetchRoomMessages(Long roomId, Long cursor, int limit) {
+        return fetchMessages("m.room_id = :scopeId", roomId, cursor, limit);
+    }
+
+    private Flux<MessageDto> fetchMessages(String scopePredicate, Long scopeId, Long cursor, int limit) {
+        String cursorPredicate = cursor == null ? "" : " AND m.id < :cursor";
+        String sql = """
+                SELECT m.id,
+                       m.channel_id,
+                       m.room_id,
+                       m.sender_user_id,
+                       u.username as sender_username,
+                       m.kind,
+                       m.body,
+                       m.reply_to_message_id,
+                       rm.body as reply_to_body,
+                       ru.username as reply_to_sender_username,
+                       m.created_at,
+                       m.edited_at,
+                       m.deleted_at
+                FROM message m
+                LEFT JOIN user u ON u.id = m.sender_user_id
+                LEFT JOIN message rm ON rm.id = m.reply_to_message_id
+                LEFT JOIN user ru ON ru.id = rm.sender_user_id
+                WHERE %s%s
+                ORDER BY m.id DESC
+                LIMIT :limit
+                """.formatted(scopePredicate, cursorPredicate);
+
+        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(sql)
+                .bind("scopeId", scopeId)
+                .bind("limit", limit);
+        if (cursor != null) {
+            spec = spec.bind("cursor", cursor);
         }
-
         return spec.map((row, metadata) -> mapRowToMessageDto(row)).all();
     }
 
@@ -204,17 +226,18 @@ public class MessageService {
         return items.get(items.size() - 1).id();
     }
 
-    private Mono<Void> validateReplyTarget(Long channelId, Long replyToMessageId) {
+    private Mono<Void> validateReplyTarget(Long channelId, Long roomId, Long replyToMessageId) {
         if (replyToMessageId == null) {
             return Mono.empty();
         }
         return messageRepository.findById(replyToMessageId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reply target not found")))
                 .flatMap(message -> {
-                    if (!Objects.equals(message.getChannelId(), channelId)) {
+                    if (!Objects.equals(message.getChannelId(), channelId)
+                            || !Objects.equals(message.getRoomId(), roomId)) {
                         return Mono.error(new ResponseStatusException(
                                 HttpStatus.BAD_REQUEST,
-                                "Reply target must be in the same channel"
+                                "Reply target must be in the same chat"
                         ));
                     }
                     return Mono.empty();
@@ -226,6 +249,7 @@ public class MessageService {
         return databaseClient.sql("""
                 SELECT m.id,
                        m.channel_id,
+                       m.room_id,
                        m.sender_user_id,
                        u.username as sender_username,
                        m.kind,
@@ -246,7 +270,7 @@ public class MessageService {
                 .map((row, metadata) -> mapRowToMessageDto(row))
                 .one()
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found")))
-                .flatMap(dto -> enrichWithReactions(userId, List.of(dto))
+                .flatMap(dto -> enrichMessages(userId, List.of(dto))
                         .map(items -> items.get(0)));
     }
 
@@ -254,6 +278,7 @@ public class MessageService {
         return new MessageDto(
                 row.get("id", Long.class),
                 row.get("channel_id", Long.class),
+                row.get("room_id", Long.class),
                 row.get("sender_user_id", Long.class),
                 row.get("sender_username", String.class),
                 MessageKind.valueOf(row.get("kind", String.class)),
@@ -262,33 +287,43 @@ public class MessageService {
                 row.get("reply_to_body", String.class),
                 row.get("reply_to_sender_username", String.class),
                 List.of(),
+                List.of(),
                 row.get("created_at", Instant.class),
                 row.get("edited_at", Instant.class),
                 row.get("deleted_at", Instant.class)
         );
     }
 
-    private Mono<List<MessageDto>> enrichWithReactions(Long userId, List<MessageDto> items) {
+    private Mono<List<MessageDto>> enrichMessages(Long userId, List<MessageDto> items) {
         if (items.isEmpty()) {
             return Mono.just(items);
         }
         List<Long> messageIds = items.stream().map(MessageDto::id).toList();
-        return fetchReactionsForMessages(userId, messageIds)
-                .map(reactionsMap -> items.stream().map(item -> new MessageDto(
-                        item.id(),
-                        item.channelId(),
-                        item.senderUserId(),
-                        item.senderUsername(),
-                        item.kind(),
-                        item.body(),
-                        item.replyToMessageId(),
-                        item.replyToBody(),
-                        item.replyToSenderUsername(),
-                        reactionsMap.getOrDefault(item.id(), List.of()),
-                        item.createdAt(),
-                        item.editedAt(),
-                        item.deletedAt()
-                )).toList());
+        Mono<Map<Long, List<MessageReactionDto>>> reactions = fetchReactionsForMessages(userId, messageIds);
+        Mono<Map<Long, List<MessageAttachmentDto>>> attachments = messageAttachmentService.fetchDtosForMessages(messageIds);
+
+        return Mono.zip(reactions, attachments)
+                .map(tuple -> {
+                    Map<Long, List<MessageReactionDto>> reactionsMap = tuple.getT1();
+                    Map<Long, List<MessageAttachmentDto>> attachmentsMap = tuple.getT2();
+                    return items.stream().map(item -> new MessageDto(
+                            item.id(),
+                            item.channelId(),
+                            item.roomId(),
+                            item.senderUserId(),
+                            item.senderUsername(),
+                            item.kind(),
+                            item.body(),
+                            item.replyToMessageId(),
+                            item.replyToBody(),
+                            item.replyToSenderUsername(),
+                            reactionsMap.getOrDefault(item.id(), List.of()),
+                            attachmentsMap.getOrDefault(item.id(), List.of()),
+                            item.createdAt(),
+                            item.editedAt(),
+                            item.deletedAt()
+                    )).toList();
+                });
     }
 
     private Mono<Map<Long, List<MessageReactionDto>>> fetchReactionsForMessages(Long userId, List<Long> messageIds) {
@@ -325,6 +360,36 @@ public class MessageService {
             }
             return map;
         });
+    }
+
+    private Mono<Void> ensureMessageAccess(Long userId, MessageEntity message) {
+        if (message.getChannelId() != null) {
+            return messengerAccessService.getChannelForAccess(userId, message.getChannelId()).then();
+        }
+        if (message.getRoomId() != null) {
+            return roomAccessService.checkUserCanJoinRoomId(userId, message.getRoomId());
+        }
+        return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message has no chat scope"));
+    }
+
+    private String normalizeBody(CreateMessageDto dto) {
+        return dto.body() == null ? "" : dto.body().trim();
+    }
+
+    private List<Long> normalizeAttachmentIds(CreateMessageDto dto) {
+        if (dto.attachmentIds() == null || dto.attachmentIds().isEmpty()) {
+            return List.of();
+        }
+        return dto.attachmentIds().stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+    }
+
+    private void validateMessageContent(String body, List<Long> attachmentIds) {
+        if ((body == null || body.isBlank()) && (attachmentIds == null || attachmentIds.isEmpty())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message body or attachment is required");
+        }
     }
 
     private String normalizeEmoji(String rawEmoji) {

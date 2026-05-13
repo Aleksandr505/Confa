@@ -865,6 +865,32 @@ body.app-shell-mode button {
     position: relative;
 }
 
+.channel-message-attachments {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    width: min(260px, 62vw);
+    max-width: 100%;
+}
+
+.channel-message-attachment {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: zoom-in;
+    border-radius: 10px;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.channel-message-attachment img {
+    display: block;
+    width: 100%;
+    max-height: 240px;
+    object-fit: cover;
+    background: rgba(15, 23, 42, 0.72);
+}
+
 .channel-message-bubble.has-reply {
     min-width: clamp(180px, 28vw, 260px);
 }
@@ -1079,10 +1105,48 @@ body.app-shell-mode button {
     margin-top: auto;
 }
 
+.composer-image-preview {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.composer-image-preview img {
+    width: 64px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: rgba(15, 23, 42, 0.72);
+}
+
+.composer-image-meta {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--shell-ink-soft);
+    font-size: 0.78rem;
+}
+
+.composer-error {
+    color: #fecdd3;
+    font-size: 0.82rem;
+}
+
 .composer-input-row {
     display: flex;
     align-items: flex-end;
     gap: 10px;
+}
+
+.composer-attach-btn {
+    flex: 0 0 auto;
+    min-height: 32px;
 }
 
 .composer textarea {
@@ -1133,6 +1197,37 @@ body.app-shell-mode button {
     background: rgba(190, 24, 93, 0.18);
     color: #fecdd3;
     font-size: 0.9rem;
+}
+
+.message-image-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(2, 6, 23, 0.82);
+}
+
+.message-image-lightbox img {
+    display: block;
+    max-width: min(96vw, 1200px);
+    max-height: 88dvh;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.message-image-lightbox__close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.9);
+    color: #e5e7eb;
+    padding: 7px 12px;
+    cursor: pointer;
 }
 
 .scroll-down-btn {
