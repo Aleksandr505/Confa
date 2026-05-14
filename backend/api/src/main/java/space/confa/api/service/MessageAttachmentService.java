@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.r2dbc.core.DatabaseClient;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -39,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -54,6 +56,7 @@ public class MessageAttachmentService {
     private final MessengerAccessService messengerAccessService;
     private final RoomAccessService roomAccessService;
     private final DatabaseClient databaseClient;
+    private final AtomicBoolean cleanupRunning = new AtomicBoolean(false);
 
     public Mono<MessageAttachmentDto> uploadImage(
             Long userId,
@@ -71,7 +74,10 @@ public class MessageAttachmentService {
 
         return access
                 .flatMap(resolvedScope -> validateRawInput(bytes, contentType)
+                        .then(enforcePendingQuotas(userId, resolvedScope))
                         .then(processImage(bytes, normalizeContentType(contentType)))
+                        .flatMap(processed -> enforceStoredByteQuotas(userId, resolvedScope, processed)
+                                .thenReturn(processed))
                         .flatMap(processed -> storeProcessed(
                                 userId,
                                 resolvedScope,
@@ -81,6 +87,53 @@ public class MessageAttachmentService {
                                 originalFilename
                         )))
                 .flatMap(this::toDto);
+    }
+
+    @Scheduled(fixedDelayString = "${attachment.image.cleanup-fixed-delay-ms:300000}")
+    public void cleanupExpiredAttachments() {
+        AttachmentProp.Image image = attachmentProp.image();
+        if (!image.cleanupEnabled()) {
+            return;
+        }
+        if (!cleanupRunning.compareAndSet(false, true)) {
+            return;
+        }
+
+        cleanupExpiredAttachmentsOnce()
+                .doOnNext(count -> {
+                    if (count > 0) {
+                        log.info("Cleaned up {} expired message attachments", count);
+                    }
+                })
+                .doOnError(error -> log.warn("Failed to cleanup expired message attachments", error))
+                .doFinally(signal -> cleanupRunning.set(false))
+                .subscribe();
+    }
+
+    public Mono<Integer> cleanupExpiredAttachmentsOnce() {
+        AttachmentProp.Image image = attachmentProp.image();
+        int batchSize = Math.max(1, image.cleanupBatchSize());
+        Instant now = Instant.now();
+        Instant pendingCutoff = Instant.now().minusSeconds(Math.max(60, image.pendingTtlSeconds()));
+
+        return databaseClient.sql("""
+                        SELECT *
+                        FROM message_attachment
+                        WHERE objects_deleted_at IS NULL
+                          AND (
+                               (status = 'PENDING' AND created_at < :pendingCutoff)
+                               OR (status = 'DELETED' AND object_cleanup_after IS NOT NULL AND object_cleanup_after < :now)
+                          )
+                        ORDER BY created_at ASC
+                        LIMIT :limit
+                        """)
+                .bind("pendingCutoff", pendingCutoff)
+                .bind("now", now)
+                .bind("limit", batchSize)
+                .map((row, metadata) -> mapRowToEntity(row))
+                .all()
+                .flatMapSequential(this::deleteObjectsAndMarkDeleted, 2)
+                .reduce(0, Integer::sum);
     }
 
     @Transactional
@@ -126,15 +179,19 @@ public class MessageAttachmentService {
     }
 
     public Mono<Void> markMessageAttachmentsDeleted(Long messageId) {
+        Instant deletedAt = Instant.now();
+        Instant objectCleanupAfter = deletedAt.plusSeconds(Math.max(60, attachmentProp.image().deletedRetentionSeconds()));
         return databaseClient.sql("""
                         UPDATE message_attachment
                         SET status = 'DELETED',
-                            deleted_at = :deletedAt
+                            deleted_at = :deletedAt,
+                            object_cleanup_after = :objectCleanupAfter
                         WHERE message_id = :messageId
                           AND status <> 'DELETED'
                         """)
                 .bind("messageId", messageId)
-                .bind("deletedAt", Instant.now())
+                .bind("deletedAt", deletedAt)
+                .bind("objectCleanupAfter", objectCleanupAfter)
                 .fetch()
                 .rowsUpdated()
                 .then();
@@ -169,6 +226,93 @@ public class MessageAttachmentService {
                     }
                     return result;
                 });
+    }
+
+    private Mono<Void> enforcePendingQuotas(Long userId, Scope scope) {
+        AttachmentProp.Image image = attachmentProp.image();
+        Mono<Void> userQuota = image.maxPendingUploadsPerUser() <= 0
+                ? Mono.empty()
+                : countPendingForUser(userId).flatMap(count -> count >= image.maxPendingUploadsPerUser()
+                        ? Mono.error(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Pending attachment limit exceeded"))
+                        : Mono.empty());
+        Mono<Void> scopeQuota = image.maxPendingUploadsPerScope() <= 0
+                ? Mono.empty()
+                : countPendingForScope(scope).flatMap(count -> count >= image.maxPendingUploadsPerScope()
+                        ? Mono.error(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Pending attachment scope limit exceeded"))
+                        : Mono.empty());
+        return userQuota.then(scopeQuota);
+    }
+
+    private Mono<Void> enforceStoredByteQuotas(Long userId, Scope scope, ProcessedImage processed) {
+        AttachmentProp.Image image = attachmentProp.image();
+        long nextBytes = (long) processed.displayBytes().length + processed.thumbnailBytes().length;
+        Mono<Void> userQuota = image.maxStoredBytesPerUser() <= 0
+                ? Mono.empty()
+                : activeStoredBytesForUser(userId).flatMap(used -> used + nextBytes > image.maxStoredBytesPerUser()
+                        ? Mono.error(new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Attachment storage quota exceeded"))
+                        : Mono.empty());
+        Mono<Void> scopeQuota = image.maxStoredBytesPerScope() <= 0
+                ? Mono.empty()
+                : activeStoredBytesForScope(scope).flatMap(used -> used + nextBytes > image.maxStoredBytesPerScope()
+                        ? Mono.error(new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Attachment scope storage quota exceeded"))
+                        : Mono.empty());
+        return userQuota.then(scopeQuota);
+    }
+
+    private Mono<Long> countPendingForUser(Long userId) {
+        return databaseClient.sql("""
+                        SELECT COUNT(*) AS item_count
+                        FROM message_attachment
+                        WHERE owner_user_id = :userId
+                          AND status = 'PENDING'
+                        """)
+                .bind("userId", userId)
+                .map((row, metadata) -> row.get("item_count", Number.class).longValue())
+                .one()
+                .defaultIfEmpty(0L);
+    }
+
+    private Mono<Long> countPendingForScope(Scope scope) {
+        String column = scope.channelId() != null ? "channel_id" : "room_id";
+        Long scopeId = scope.channelId() != null ? scope.channelId() : scope.roomId();
+        return databaseClient.sql("""
+                        SELECT COUNT(*) AS item_count
+                        FROM message_attachment
+                        WHERE %s = :scopeId
+                          AND status = 'PENDING'
+                        """.formatted(column))
+                .bind("scopeId", scopeId)
+                .map((row, metadata) -> row.get("item_count", Number.class).longValue())
+                .one()
+                .defaultIfEmpty(0L);
+    }
+
+    private Mono<Long> activeStoredBytesForUser(Long userId) {
+        return databaseClient.sql("""
+                        SELECT COALESCE(SUM(stored_size_bytes + thumbnail_size_bytes), 0) AS stored_bytes
+                        FROM message_attachment
+                        WHERE owner_user_id = :userId
+                          AND status <> 'DELETED'
+                        """)
+                .bind("userId", userId)
+                .map((row, metadata) -> row.get("stored_bytes", Number.class).longValue())
+                .one()
+                .defaultIfEmpty(0L);
+    }
+
+    private Mono<Long> activeStoredBytesForScope(Scope scope) {
+        String column = scope.channelId() != null ? "channel_id" : "room_id";
+        Long scopeId = scope.channelId() != null ? scope.channelId() : scope.roomId();
+        return databaseClient.sql("""
+                        SELECT COALESCE(SUM(stored_size_bytes + thumbnail_size_bytes), 0) AS stored_bytes
+                        FROM message_attachment
+                        WHERE %s = :scopeId
+                          AND status <> 'DELETED'
+                        """.formatted(column))
+                .bind("scopeId", scopeId)
+                .map((row, metadata) -> row.get("stored_bytes", Number.class).longValue())
+                .one()
+                .defaultIfEmpty(0L);
     }
 
     private Scope resolveRequestedScope(Long channelId, String roomName) {
@@ -250,9 +394,15 @@ public class MessageAttachmentService {
                     String keyBase = "message-attachments/users/" + userId + "/" + scopePart + "/" + token;
                     String displayKey = keyBase + "-display.jpg";
                     String thumbnailKey = keyBase + "-thumb.jpg";
-                    avatarStorageService.putObject(displayKey, processed.displayBytes(), STORED_CONTENT_TYPE);
-                    avatarStorageService.putObject(thumbnailKey, processed.thumbnailBytes(), STORED_CONTENT_TYPE);
-                    return MessageAttachmentEntity.builder()
+                    try {
+                        avatarStorageService.putObject(displayKey, processed.displayBytes(), STORED_CONTENT_TYPE);
+                        avatarStorageService.putObject(thumbnailKey, processed.thumbnailBytes(), STORED_CONTENT_TYPE);
+                    } catch (Exception e) {
+                        safeDeleteObject(displayKey);
+                        safeDeleteObject(thumbnailKey);
+                        throw e;
+                    }
+                    MessageAttachmentEntity entity = MessageAttachmentEntity.builder()
                             .channelId(scope.channelId())
                             .roomId(scope.roomId())
                             .ownerUserId(userId)
@@ -272,9 +422,100 @@ public class MessageAttachmentService {
                             .thumbnailHeight(processed.thumbnailHeight())
                             .checksumSha256(sha256Hex(originalBytes))
                             .build();
+                    return new StoredAttachment(entity, displayKey, thumbnailKey);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(messageAttachmentRepository::save);
+                .flatMap(stored -> messageAttachmentRepository.save(stored.entity())
+                        .onErrorResume(error -> bestEffortDeleteAttachmentObjects(stored.displayObjectKey(), stored.thumbnailObjectKey())
+                                .then(Mono.error(error))));
+    }
+
+    private Mono<Integer> deleteObjectsAndMarkDeleted(MessageAttachmentEntity attachment) {
+        Instant now = Instant.now();
+        Instant pendingCutoff = now.minusSeconds(Math.max(60, attachmentProp.image().pendingTtlSeconds()));
+        return claimAttachmentForObjectCleanup(attachment.getId(), now, pendingCutoff)
+                .flatMap(claimed -> {
+                    if (!claimed) {
+                        return Mono.just(0);
+                    }
+                    return deleteAttachmentObjects(attachment.getDisplayObjectKey(), attachment.getThumbnailObjectKey())
+                            .then(markAttachmentObjectsDeleted(attachment.getId(), now))
+                            .thenReturn(1);
+                });
+    }
+
+    private Mono<Boolean> claimAttachmentForObjectCleanup(Long attachmentId, Instant now, Instant pendingCutoff) {
+        return databaseClient.sql("""
+                        UPDATE message_attachment
+                        SET status = 'DELETED',
+                            deleted_at = COALESCE(deleted_at, :deletedAt),
+                            object_cleanup_after = COALESCE(object_cleanup_after, :cleanupAfter)
+                        WHERE id = :attachmentId
+                          AND objects_deleted_at IS NULL
+                          AND (
+                               (status = 'PENDING' AND created_at < :pendingCutoff)
+                               OR (status = 'DELETED' AND object_cleanup_after IS NOT NULL AND object_cleanup_after < :now)
+                          )
+                        """)
+                .bind("deletedAt", now)
+                .bind("cleanupAfter", now)
+                .bind("attachmentId", attachmentId)
+                .bind("pendingCutoff", pendingCutoff)
+                .bind("now", now)
+                .fetch()
+                .rowsUpdated()
+                .map(count -> count > 0)
+                .defaultIfEmpty(false);
+    }
+
+    private Mono<Void> markAttachmentObjectsDeleted(Long attachmentId, Instant objectsDeletedAt) {
+        return databaseClient.sql("""
+                        UPDATE message_attachment
+                        SET objects_deleted_at = :objectsDeletedAt
+                        WHERE id = :attachmentId
+                          AND objects_deleted_at IS NULL
+                        """)
+                .bind("objectsDeletedAt", objectsDeletedAt)
+                .bind("attachmentId", attachmentId)
+                .fetch()
+                .rowsUpdated()
+                .then();
+    }
+
+    private Mono<Void> deleteAttachmentObjects(String displayObjectKey, String thumbnailObjectKey) {
+        return Mono.fromRunnable(() -> {
+                    deleteObject(displayObjectKey);
+                    deleteObject(thumbnailObjectKey);
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
+    }
+
+    private Mono<Void> bestEffortDeleteAttachmentObjects(String displayObjectKey, String thumbnailObjectKey) {
+        return Mono.fromRunnable(() -> {
+                    safeDeleteObject(displayObjectKey);
+                    safeDeleteObject(thumbnailObjectKey);
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
+    }
+
+    private void deleteObject(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return;
+        }
+        avatarStorageService.deleteObject(objectKey);
+    }
+
+    private void safeDeleteObject(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return;
+        }
+        try {
+            avatarStorageService.deleteObject(objectKey);
+        } catch (Exception e) {
+            log.warn("Failed to delete message attachment object key={}", objectKey, e);
+        }
     }
 
     private EncodedImage encodeToLimit(BufferedImage source, int maxEdge, long maxBytes, float startQuality) {
@@ -414,6 +655,8 @@ public class MessageAttachmentService {
                 .createdAt(row.get("created_at", Instant.class))
                 .attachedAt(row.get("attached_at", Instant.class))
                 .deletedAt(row.get("deleted_at", Instant.class))
+                .objectCleanupAfter(row.get("object_cleanup_after", Instant.class))
+                .objectsDeletedAt(row.get("objects_deleted_at", Instant.class))
                 .build();
     }
 
@@ -423,6 +666,7 @@ public class MessageAttachmentService {
 
     private Mono<MessageAttachmentDto> toDto(MessageAttachmentEntity attachment) {
         Duration ttl = Duration.ofSeconds(Math.max(60, attachmentProp.image().presignTtlSeconds()));
+        Instant urlExpiresAt = Instant.now().plus(ttl);
         Mono<String> displayUrl = presign(attachment.getDisplayObjectKey(), ttl);
         Mono<String> thumbnailUrl = presign(attachment.getThumbnailObjectKey(), ttl);
 
@@ -441,7 +685,8 @@ public class MessageAttachmentService {
                         attachment.getThumbnailSizeBytes(),
                         attachment.getThumbnailWidth(),
                         attachment.getThumbnailHeight(),
-                        attachment.getCreatedAt()
+                        attachment.getCreatedAt(),
+                        urlExpiresAt
                 ));
     }
 
@@ -529,5 +774,6 @@ public class MessageAttachmentService {
     ) {}
 
     private record EncodedImage(byte[] bytes, int width, int height) {}
+    private record StoredAttachment(MessageAttachmentEntity entity, String displayObjectKey, String thumbnailObjectKey) {}
     private record AttachmentWithMessage(Long messageId, MessageAttachmentDto dto) {}
 }

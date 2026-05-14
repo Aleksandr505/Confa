@@ -18,6 +18,7 @@ import MessageTimeline from '../components/MessageTimeline';
 import { getErrorMessage } from '../lib/errors';
 import MessageComposer from '../components/MessageComposer';
 import type { CompressedChatImage } from '../lib/imageCompression';
+import { mergeMessagesById } from '../lib/messageMerge';
 
 export default function ChannelViewPage() {
     const { channelId } = useParams();
@@ -69,13 +70,6 @@ export default function ChannelViewPage() {
         if (!currentChannelId || isVoice) return;
         let active = true;
 
-        const mergeById = (prev: MessageDto[], incoming: MessageDto[]) => {
-            const map = new Map<number, MessageDto>();
-            for (const msg of prev) map.set(msg.id, msg);
-            for (const msg of incoming) map.set(msg.id, msg);
-            return Array.from(map.values()).sort((a, b) => a.id - b.id);
-        };
-
         const loadMessages = async (silent: boolean) => {
             if (!silent) {
                 setLoading(true);
@@ -85,7 +79,7 @@ export default function ChannelViewPage() {
                 const page = await fetchChannelMessages(currentChannelId);
                 if (!active) return;
                 const items = page.items.slice().reverse();
-                setMessages(prev => mergeById(prev, items));
+                setMessages(prev => mergeMessagesById(prev, items));
             } catch (e: unknown) {
                 if (!silent && active) {
                     setError(getErrorMessage(e, 'Failed to load messages'));

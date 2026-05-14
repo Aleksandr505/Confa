@@ -15,6 +15,15 @@ public record AttachmentProp(
             int maxThumbnailEdge,
             long maxThumbnailBytes,
             int maxAttachmentsPerMessage,
-            long presignTtlSeconds
+            long presignTtlSeconds,
+            boolean cleanupEnabled,
+            long pendingTtlSeconds,
+            long deletedRetentionSeconds,
+            int cleanupBatchSize,
+            long cleanupFixedDelayMs,
+            int maxPendingUploadsPerUser,
+            int maxPendingUploadsPerScope,
+            long maxStoredBytesPerUser,
+            long maxStoredBytesPerScope
     ) {}
 }

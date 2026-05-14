@@ -66,3 +66,12 @@ attachment:
     max-thumbnail-bytes: ${ATTACHMENT_IMAGE_MAX_THUMBNAIL_BYTES:81920}
     max-attachments-per-message: ${ATTACHMENT_IMAGE_MAX_ATTACHMENTS_PER_MESSAGE:1}
     presign-ttl-seconds: ${ATTACHMENT_IMAGE_PRESIGN_TTL_SECONDS:900}
+    cleanup-enabled: ${ATTACHMENT_IMAGE_CLEANUP_ENABLED:true}
+    pending-ttl-seconds: ${ATTACHMENT_IMAGE_PENDING_TTL_SECONDS:3600}
+    deleted-retention-seconds: ${ATTACHMENT_IMAGE_DELETED_RETENTION_SECONDS:604800}
+    cleanup-batch-size: ${ATTACHMENT_IMAGE_CLEANUP_BATCH_SIZE:100}
+    cleanup-fixed-delay-ms: ${ATTACHMENT_IMAGE_CLEANUP_FIXED_DELAY_MS:300000}
+    max-pending-uploads-per-user: ${ATTACHMENT_IMAGE_MAX_PENDING_UPLOADS_PER_USER:20}
+    max-pending-uploads-per-scope: ${ATTACHMENT_IMAGE_MAX_PENDING_UPLOADS_PER_SCOPE:200}
+    max-stored-bytes-per-user: ${ATTACHMENT_IMAGE_MAX_STORED_BYTES_PER_USER:1073741824}
+    max-stored-bytes-per-scope: ${ATTACHMENT_IMAGE_MAX_STORED_BYTES_PER_SCOPE:2147483648}

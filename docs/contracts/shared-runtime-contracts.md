@@ -67,11 +67,11 @@ Do not change endpoint paths or DTO field names without updating backend control
 | Messenger messages | Channel and DM messages are stored in `message` rows with `channel_id` set and `room_id` null. | `MessageService.java`, `MessageDto.java`, `frontend/client/src/api.ts` |
 | Conference messages | Conference room chat uses the same `message` DTO/table with `room_id` set and `channel_id` null; LiveKit chat is not canonical history. | `RoomMessageController.java`, `MessageService.java`, `frontend/client/src/pages/Room.tsx` |
 | Message DTO scope | `MessageDto.channelId` can be null for room messages, and `MessageDto.roomId` can be null for channel/DM messages. Exactly one scope is present. | `MessageDto.java`, `frontend/client/src/api.ts` |
-| Message attachments | `MessageDto.attachments` contains optimized image attachment metadata, thumbnail URL, display URL, dimensions, content type, and size. | `MessageAttachmentDto.java`, `frontend/client/src/api.ts` |
+| Message attachments | `MessageDto.attachments` contains optimized image attachment metadata, thumbnail URL, display URL, URL expiry, dimensions, content type, and size. | `MessageAttachmentDto.java`, `frontend/client/src/api.ts` |
 | Image upload | Client uploads compressed images to `POST /api/attachments/images` with either `channelId` or `roomName`; backend creates a pending attachment that is attached by `attachmentIds` on message creation. | `MessageAttachmentController.java`, `MessageAttachmentService.java`, `MessageComposer.tsx` |
 | Image-only messages | Message body may be empty only when at least one valid attachment ID is provided. | `CreateMessageDto.java`, `MessageService.java` |
 | Image optimization | Client targets max edge `1280px` and `<= 512000` bytes; backend revalidates, strips metadata by re-encoding, stores JPEG display and thumbnail objects, and does not store chat image originals by default. | `MessageAttachmentService.java`, `frontend/client/src/lib/imageCompression.ts` |
-| Attachment URLs | Message responses contain short-lived presigned URLs generated only after the caller has access to the message list. | `MessageAttachmentService.java` |
+| Attachment URLs | Message responses contain short-lived presigned URLs and `urlExpiresAt`, generated only after the caller has access to the message list. Client polling preserves existing URLs until they are near expiry to avoid reloading images every refresh. | `MessageAttachmentService.java`, `frontend/client/src/lib/messageMerge.ts` |
 
 The first backend implementation accepts JPEG and PNG uploads. WebP can be enabled only after backend decoding and encoding support is added deliberately.
 
@@ -103,7 +103,7 @@ Changing any item in this table requires coordinated changes in `backend/api`, `
 | `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | API, agents runtime | API uses these for server-side LiveKit operations; agents runtime also needs LiveKit credentials. |
 | `CLIENT_BASE_URL` | API | Used when producing client-facing invite links. |
 | `AVATAR_S3_*` | API, Compose | S3-compatible storage endpoint, bucket, credentials, region, and path-style behavior. |
-| `ATTACHMENT_IMAGE_*` | API, Compose | Raw upload, decoded image, optimized display, thumbnail, attachment-count, and presigned URL limits for message images. |
+| `ATTACHMENT_IMAGE_*` | API, Compose | Raw upload, decoded image, optimized display, thumbnail, attachment-count, cleanup, quota, retention, and presigned URL limits for message images. |
 | `VITE_API_BASE` | Client SPA, Admin SPA | Build-time API base URL embedded by Vite. |
 | `VITE_LIVEKIT_WS_URL` | Client SPA | Build-time LiveKit WebSocket URL embedded by Vite. |
 | `LLM_PROVIDER`, `STT_PROVIDER`, `TTS_PROVIDER` | Agents worker | Selects provider paths in `agents/src/agent.ts`. |
@@ -116,4 +116,4 @@ Changing any item in this table requires coordinated changes in `backend/api`, `
 - Java domain enums and frontend TypeScript unions must stay compatible with MySQL enum columns.
 - Soft-delete columns such as `deleted_at` must be preserved in list queries and indexes.
 - The `message` table is shared by channel/DM and conference chat. Exactly one of `channel_id` or `room_id` must be set.
-- `message_attachment` rows start as `PENDING`, become `ATTACHED` when linked to a message, and are soft-deleted with the message.
+- `message_attachment` rows start as `PENDING`, become `ATTACHED` when linked to a message, and are soft-deleted with the message. Expired pending rows and retained deleted rows are cleaned by the API attachment cleanup job, which claims eligible rows with `object_cleanup_after`, deletes S3 objects, and records `objects_deleted_at`.

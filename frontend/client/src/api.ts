@@ -117,6 +117,7 @@ export type MessageAttachmentDto = {
     thumbnailWidth?: number | null;
     thumbnailHeight?: number | null;
     createdAt?: string | null;
+    urlExpiresAt?: string | null;
 };
 
 export type MessagePageDto = {

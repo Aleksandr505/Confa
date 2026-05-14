@@ -3,8 +3,10 @@ package space.confa.api;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
+@EnableScheduling
 @ConfigurationPropertiesScan("space.confa.api.configuration.properties")
 public class ApiApplication {
 

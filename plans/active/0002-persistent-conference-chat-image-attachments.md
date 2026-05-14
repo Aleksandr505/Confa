@@ -134,7 +134,7 @@ Conference-room attachment retention should be conservative unless product requi
 - [x] Gate room chat APIs through `RoomAccessService.checkUserCanJoin`.
 - [x] Extend messenger message APIs and DTOs to include attachments.
 - [x] Support image-only messages by allowing an empty body when at least one attachment is attached.
-- [ ] Add cleanup path for orphaned attachments.
+- [x] Add cleanup path for orphaned attachments.
 - [x] Add configurable limits through `application.yml` and deploy env vars.
 - [x] Decide whether image content is served through access-checked backend proxy endpoints or short-lived presigned URLs.
 
@@ -157,10 +157,10 @@ Conference-room attachment retention should be conservative unless product requi
 
 ## Deployment And Operations Plan
 
-- [ ] Add env vars for raw upload size, stored display size, image dimensions, thumbnail dimensions, retention, per-user/per-room quotas, and storage bucket if needed.
-- [ ] Document storage growth risks in deployment docs.
-- [ ] Add a cleanup runbook or scheduled cleanup task for orphaned or expired attachments.
-- [ ] Confirm MinIO/S3 public URL behavior for thumbnails and display images.
+- [x] Add env vars for raw upload size, stored display size, image dimensions, thumbnail dimensions, retention, per-user/per-room quotas, and storage bucket if needed.
+- [x] Document storage growth risks in deployment docs.
+- [x] Add a cleanup runbook or scheduled cleanup task for orphaned or expired attachments.
+- [x] Confirm MinIO/S3 public URL behavior for thumbnails and display images.
 
 ## Verification
 

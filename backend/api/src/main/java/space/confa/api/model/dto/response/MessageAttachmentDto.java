@@ -16,5 +16,6 @@ public record MessageAttachmentDto(
         Long thumbnailSizeBytes,
         Integer thumbnailWidth,
         Integer thumbnailHeight,
-        Instant createdAt
+        Instant createdAt,
+        Instant urlExpiresAt
 ) {}

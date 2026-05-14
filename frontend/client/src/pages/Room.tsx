@@ -71,6 +71,7 @@ import { getErrorMessage } from '../lib/errors';
 import MessageTimeline from '../components/MessageTimeline';
 import MessageComposer from '../components/MessageComposer';
 import type { CompressedChatImage } from '../lib/imageCompression';
+import { mergeMessagesById } from '../lib/messageMerge';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 let presenceToneAudioCtx: AudioContext | null = null;
@@ -1649,13 +1650,6 @@ function RoomChatPanel({ roomName, visible }: { roomName: string; visible: boole
     useEffect(() => {
         let active = true;
 
-        const mergeById = (prev: MessageDto[], incoming: MessageDto[]) => {
-            const map = new Map<number, MessageDto>();
-            for (const msg of prev) map.set(msg.id, msg);
-            for (const msg of incoming) map.set(msg.id, msg);
-            return Array.from(map.values()).sort((a, b) => a.id - b.id);
-        };
-
         const loadMessages = async (silent: boolean) => {
             if (!silent) {
                 setLoading(true);
@@ -1665,7 +1659,7 @@ function RoomChatPanel({ roomName, visible }: { roomName: string; visible: boole
                 const page = await fetchRoomMessages(roomName);
                 if (!active) return;
                 const items = page.items.slice().reverse();
-                setMessages(prev => mergeById(prev, items));
+                setMessages(prev => mergeMessagesById(prev, items));
             } catch (e) {
                 if (!silent && active) {
                     setError(getErrorMessage(e, 'Не удалось загрузить чат'));

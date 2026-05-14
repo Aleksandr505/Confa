@@ -40,4 +40,6 @@ public class MessageAttachmentEntity {
     private Instant createdAt;
     private Instant attachedAt;
     private Instant deletedAt;
+    private Instant objectCleanupAfter;
+    private Instant objectsDeletedAt;
 }

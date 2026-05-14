@@ -39,6 +39,8 @@ create table message_attachment
     created_at            timestamp default CURRENT_TIMESTAMP         null,
     attached_at           timestamp                                   null,
     deleted_at            timestamp                                   null,
+    object_cleanup_after  timestamp                                   null,
+    objects_deleted_at    timestamp                                   null,
     constraint fk_message_attachment_message foreign key (message_id) references message (id),
     constraint fk_message_attachment_channel foreign key (channel_id) references channel (id),
     constraint fk_message_attachment_room foreign key (room_id) references room (id),
@@ -53,3 +55,5 @@ create index idx_message_attachment_message on message_attachment (message_id, s
 create index idx_message_attachment_pending on message_attachment (owner_user_id, status, created_at);
 create index idx_message_attachment_channel on message_attachment (channel_id, status, created_at);
 create index idx_message_attachment_room on message_attachment (room_id, status, created_at);
+create index idx_message_attachment_cleanup_pending on message_attachment (status, created_at);
+create index idx_message_attachment_cleanup_deleted on message_attachment (status, object_cleanup_after, objects_deleted_at);
