@@ -86,7 +86,8 @@ export type ChannelDto = {
 
 export type MessageDto = {
     id: number;
-    channelId: number;
+    channelId: number | null;
+    roomId?: number | null;
     senderUserId: number | null;
     senderUsername?: string | null;
     kind: 'USER' | 'SYSTEM' | 'BOT';
@@ -95,9 +96,28 @@ export type MessageDto = {
     replyToBody?: string | null;
     replyToSenderUsername?: string | null;
     reactions?: MessageReactionDto[];
+    attachments?: MessageAttachmentDto[];
     createdAt: string;
     editedAt?: string | null;
     deletedAt?: string | null;
+};
+
+export type MessageAttachmentDto = {
+    id: number;
+    thumbnailUrl: string;
+    displayUrl: string;
+    originalFilename?: string | null;
+    originalContentType?: string | null;
+    originalSizeBytes?: number | null;
+    contentType: string;
+    sizeBytes: number;
+    width: number;
+    height: number;
+    thumbnailSizeBytes?: number | null;
+    thumbnailWidth?: number | null;
+    thumbnailHeight?: number | null;
+    createdAt?: string | null;
+    urlExpiresAt?: string | null;
 };
 
 export type MessagePageDto = {
@@ -233,10 +253,11 @@ export async function createChannelMessage(
     channelId: number,
     body: string,
     replyToMessageId?: number | null,
+    attachmentIds?: number[],
 ): Promise<MessageDto> {
     return http<MessageDto>(`/api/channels/${channelId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ body, replyToMessageId: replyToMessageId ?? null }),
+        body: JSON.stringify({ body, replyToMessageId: replyToMessageId ?? null, attachmentIds: attachmentIds ?? [] }),
     });
 }
 
@@ -260,10 +281,55 @@ export async function createDmMessage(
     peerId: number,
     body: string,
     replyToMessageId?: number | null,
+    attachmentIds?: number[],
 ): Promise<MessageDto> {
     return http<MessageDto>(`/api/dm/${peerId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ body, replyToMessageId: replyToMessageId ?? null }),
+        body: JSON.stringify({ body, replyToMessageId: replyToMessageId ?? null, attachmentIds: attachmentIds ?? [] }),
+    });
+}
+
+export async function fetchRoomMessages(
+    roomName: string,
+    cursor?: number,
+    limit?: number,
+): Promise<MessagePageDto> {
+    const params = new URLSearchParams();
+    if (cursor) params.set('cursor', String(cursor));
+    if (limit) params.set('limit', String(limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return http<MessagePageDto>(`/rooms/${encodeURIComponent(roomName)}/messages${suffix}`, { method: 'GET' });
+}
+
+export async function createRoomMessage(
+    roomName: string,
+    body: string,
+    replyToMessageId?: number | null,
+    attachmentIds?: number[],
+): Promise<MessageDto> {
+    return http<MessageDto>(`/rooms/${encodeURIComponent(roomName)}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ body, replyToMessageId: replyToMessageId ?? null, attachmentIds: attachmentIds ?? [] }),
+    });
+}
+
+export async function uploadMessageImage(
+    file: File,
+    scope: { channelId: number } | { roomName: string },
+): Promise<MessageAttachmentDto> {
+    const params = new URLSearchParams();
+    if ('channelId' in scope) {
+        params.set('channelId', String(scope.channelId));
+    } else {
+        params.set('roomName', scope.roomName);
+    }
+
+    const form = new FormData();
+    form.append('file', file);
+
+    return http<MessageAttachmentDto>(`/api/attachments/images?${params.toString()}`, {
+        method: 'POST',
+        body: form,
     });
 }
 

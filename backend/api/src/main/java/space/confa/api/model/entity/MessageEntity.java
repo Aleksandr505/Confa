@@ -19,6 +19,7 @@ public class MessageEntity {
     @Id
     private Long id;
     private Long channelId;
+    private Long roomId;
     private Long senderUserId;
     private MessageKind kind;
     private String body;

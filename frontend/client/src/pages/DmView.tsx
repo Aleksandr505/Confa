@@ -4,15 +4,20 @@ import { useAppShell } from './AppShellContext';
 import {
     type MessageDto,
     addMessageReaction,
+    createDmChannel,
     createDmMessage,
     fetchDmMessages,
     markChannelRead,
     removeMessageReaction,
     resolveAvatarsBatch,
+    uploadMessageImage,
 } from '../api';
 import { getUserIdentity } from '../lib/auth';
 import MessageTimeline from '../components/MessageTimeline';
 import { getErrorMessage } from '../lib/errors';
+import MessageComposer from '../components/MessageComposer';
+import type { CompressedChatImage } from '../lib/imageCompression';
+import { mergeMessagesById } from '../lib/messageMerge';
 
 export default function DmViewPage() {
     const { peerId } = useParams();
@@ -20,13 +25,11 @@ export default function DmViewPage() {
     const [messages, setMessages] = useState<MessageDto[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [draft, setDraft] = useState('');
     const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
     const [showScrollDown, setShowScrollDown] = useState(false);
     const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<number, string>>({});
     const resolvedAvatarByUserIdRef = useRef<Map<number, string | null>>(new Map());
     const listRef = useRef<HTMLDivElement | null>(null);
-    const composerRef = useRef<HTMLTextAreaElement | null>(null);
     const autoScrollRef = useRef(true);
     const lastMarkedReadMessageIdRef = useRef<number | null>(null);
     const myUserId = useMemo(() => {
@@ -64,13 +67,6 @@ export default function DmViewPage() {
         if (!numericPeerId) return;
         let active = true;
 
-        const mergeById = (prev: MessageDto[], incoming: MessageDto[]) => {
-            const map = new Map<number, MessageDto>();
-            for (const msg of prev) map.set(msg.id, msg);
-            for (const msg of incoming) map.set(msg.id, msg);
-            return Array.from(map.values()).sort((a, b) => a.id - b.id);
-        };
-
         const loadMessages = async (silent: boolean) => {
             if (!silent) {
                 setLoading(true);
@@ -80,7 +76,7 @@ export default function DmViewPage() {
                 const page = await fetchDmMessages(numericPeerId);
                 if (!active) return;
                 const items = page.items.slice().reverse();
-                setMessages(prev => mergeById(prev, items));
+                setMessages(prev => mergeMessagesById(prev, items));
             } catch (e: unknown) {
                 if (!silent && active) {
                     setError(getErrorMessage(e, 'Failed to load messages'));
@@ -191,20 +187,6 @@ export default function DmViewPage() {
         };
     }, [messages, peer?.channelId, refreshDms]);
 
-    const autoResizeComposer = () => {
-        const textarea = composerRef.current;
-        if (!textarea) return;
-        textarea.style.height = '0px';
-        const maxHeight = 160;
-        const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
-        textarea.style.height = `${Math.max(24, nextHeight)}px`;
-        textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
-    };
-
-    useEffect(() => {
-        autoResizeComposer();
-    }, [draft]);
-
     const handleScroll = () => {
         const list = listRef.current;
         if (!list) return;
@@ -223,17 +205,24 @@ export default function DmViewPage() {
         setShowScrollDown(false);
     };
 
-    async function sendMessage() {
+    async function sendMessage(body: string, image?: CompressedChatImage) {
         if (!numericPeerId) return;
-        const trimmed = draft.trim();
-        if (!trimmed) return;
-        setDraft('');
         try {
-            const msg = await createDmMessage(numericPeerId, trimmed, replyTo?.id);
+            let attachmentIds: number[] = [];
+            if (image) {
+                const channel = peer?.channelId
+                    ? { id: peer.channelId }
+                    : await createDmChannel(numericPeerId);
+                const attachment = await uploadMessageImage(image.file, { channelId: channel.id });
+                attachmentIds = [attachment.id];
+            }
+            const msg = await createDmMessage(numericPeerId, body, replyTo?.id, attachmentIds);
             setMessages(prev => [...prev, msg]);
             setReplyTo(null);
+            setError(null);
         } catch (e: unknown) {
             setError(getErrorMessage(e, 'Failed to send message'));
+            throw e;
         }
     }
 
@@ -288,40 +277,13 @@ export default function DmViewPage() {
                 )}
             </div>
 
-            <div className="composer">
-                {replyTo && (
-                    <div className="composer-reply">
-                        <div className="composer-reply-text">
-                            <span className="composer-reply-author">
-                                Replying to {replyTo.senderUsername || `User ${replyTo.senderUserId ?? 'System'}`}
-                            </span>
-                            <span className="composer-reply-body">{replyTo.body}</span>
-                        </div>
-                        <button className="ghost-btn" type="button" onClick={() => setReplyTo(null)}>
-                            Cancel
-                        </button>
-                    </div>
-                )}
-                <div className="composer-input-row">
-                    <textarea
-                        ref={composerRef}
-                        value={draft}
-                        onChange={e => setDraft(e.target.value)}
-                        onInput={autoResizeComposer}
-                        placeholder={`Message ${peer?.peerUsername || 'user'}`}
-                        rows={1}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                sendMessage();
-                            }
-                        }}
-                    />
-                    <button className="primary-btn" type="button" onClick={sendMessage}>
-                        Send
-                    </button>
-                </div>
-            </div>
+            <MessageComposer
+                key={`dm-composer-${numericPeerId}`}
+                placeholder={`Message ${peer?.peerUsername || 'user'}`}
+                replyTo={replyTo}
+                onCancelReply={() => setReplyTo(null)}
+                onSend={sendMessage}
+            />
         </section>
     );
 }

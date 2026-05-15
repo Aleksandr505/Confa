@@ -10,11 +10,15 @@ import {
     markChannelRead,
     removeMessageReaction,
     resolveAvatarsBatch,
+    uploadMessageImage,
 } from '../api';
 import { getUserIdentity } from '../lib/auth';
 import VoiceChannelView from './VoiceChannelView';
 import MessageTimeline from '../components/MessageTimeline';
 import { getErrorMessage } from '../lib/errors';
+import MessageComposer from '../components/MessageComposer';
+import type { CompressedChatImage } from '../lib/imageCompression';
+import { mergeMessagesById } from '../lib/messageMerge';
 
 export default function ChannelViewPage() {
     const { channelId } = useParams();
@@ -22,13 +26,11 @@ export default function ChannelViewPage() {
     const [messages, setMessages] = useState<MessageDto[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [draft, setDraft] = useState('');
     const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
     const [showScrollDown, setShowScrollDown] = useState(false);
     const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<number, string>>({});
     const resolvedAvatarByUserIdRef = useRef<Map<number, string | null>>(new Map());
     const listRef = useRef<HTMLDivElement | null>(null);
-    const composerRef = useRef<HTMLTextAreaElement | null>(null);
     const autoScrollRef = useRef(true);
     const lastMarkedReadMessageIdRef = useRef<number | null>(null);
     const navigate = useNavigate();
@@ -68,13 +70,6 @@ export default function ChannelViewPage() {
         if (!currentChannelId || isVoice) return;
         let active = true;
 
-        const mergeById = (prev: MessageDto[], incoming: MessageDto[]) => {
-            const map = new Map<number, MessageDto>();
-            for (const msg of prev) map.set(msg.id, msg);
-            for (const msg of incoming) map.set(msg.id, msg);
-            return Array.from(map.values()).sort((a, b) => a.id - b.id);
-        };
-
         const loadMessages = async (silent: boolean) => {
             if (!silent) {
                 setLoading(true);
@@ -84,7 +79,7 @@ export default function ChannelViewPage() {
                 const page = await fetchChannelMessages(currentChannelId);
                 if (!active) return;
                 const items = page.items.slice().reverse();
-                setMessages(prev => mergeById(prev, items));
+                setMessages(prev => mergeMessagesById(prev, items));
             } catch (e: unknown) {
                 if (!silent && active) {
                     setError(getErrorMessage(e, 'Failed to load messages'));
@@ -195,20 +190,6 @@ export default function ChannelViewPage() {
         };
     }, [currentChannelId, isVoice, messages, refreshWorkspaceChannels]);
 
-    const autoResizeComposer = () => {
-        const textarea = composerRef.current;
-        if (!textarea) return;
-        textarea.style.height = '0px';
-        const maxHeight = 160;
-        const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
-        textarea.style.height = `${Math.max(24, nextHeight)}px`;
-        textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
-    };
-
-    useEffect(() => {
-        autoResizeComposer();
-    }, [draft]);
-
     const handleScroll = () => {
         const list = listRef.current;
         if (!list) return;
@@ -227,17 +208,19 @@ export default function ChannelViewPage() {
         setShowScrollDown(false);
     };
 
-    async function sendMessage() {
+    async function sendMessage(body: string, image?: CompressedChatImage) {
         if (!currentChannelId) return;
-        const trimmed = draft.trim();
-        if (!trimmed) return;
-        setDraft('');
         try {
-            const msg = await createChannelMessage(currentChannelId, trimmed, replyTo?.id);
+            const attachmentIds = image
+                ? [(await uploadMessageImage(image.file, { channelId: currentChannelId })).id]
+                : [];
+            const msg = await createChannelMessage(currentChannelId, body, replyTo?.id, attachmentIds);
             setMessages(prev => [...prev, msg]);
             setReplyTo(null);
+            setError(null);
         } catch (e: unknown) {
             setError(getErrorMessage(e, 'Failed to send message'));
+            throw e;
         }
     }
 
@@ -310,40 +293,13 @@ export default function ChannelViewPage() {
                         )}
                     </div>
 
-                    <div className="composer">
-                        {replyTo && (
-                            <div className="composer-reply">
-                                <div className="composer-reply-text">
-                                    <span className="composer-reply-author">
-                                        Replying to {replyTo.senderUsername || `User ${replyTo.senderUserId ?? 'System'}`}
-                                    </span>
-                                    <span className="composer-reply-body">{replyTo.body}</span>
-                                </div>
-                                <button className="ghost-btn" type="button" onClick={() => setReplyTo(null)}>
-                                    Cancel
-                                </button>
-                            </div>
-                        )}
-                        <div className="composer-input-row">
-                            <textarea
-                                ref={composerRef}
-                                value={draft}
-                                onChange={e => setDraft(e.target.value)}
-                                onInput={autoResizeComposer}
-                                placeholder={`Message ${channel?.name || 'channel'}`}
-                                rows={1}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        sendMessage();
-                                    }
-                                }}
-                            />
-                            <button className="primary-btn" type="button" onClick={sendMessage}>
-                                Send
-                            </button>
-                        </div>
-                    </div>
+                    <MessageComposer
+                        key={`channel-composer-${currentChannelId}`}
+                        placeholder={`Message ${channel?.name || 'channel'}`}
+                        replyTo={replyTo}
+                        onCancelReply={() => setReplyTo(null)}
+                        onSend={sendMessage}
+                    />
                 </>
             )}
         </section>

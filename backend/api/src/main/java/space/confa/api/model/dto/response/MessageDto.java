@@ -8,6 +8,7 @@ import java.util.List;
 public record MessageDto(
         Long id,
         Long channelId,
+        Long roomId,
         Long senderUserId,
         String senderUsername,
         MessageKind kind,
@@ -16,6 +17,7 @@ public record MessageDto(
         String replyToBody,
         String replyToSenderUsername,
         List<MessageReactionDto> reactions,
+        List<MessageAttachmentDto> attachments,
         Instant createdAt,
         Instant editedAt,
         Instant deletedAt

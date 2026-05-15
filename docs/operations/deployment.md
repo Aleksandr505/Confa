@@ -4,7 +4,7 @@ summary: Build, configure, deploy, and verify the current Confa Docker Compose s
 doc_type: runbook
 status: active
 owner: core-team
-last_reviewed: 2026-04-26
+last_reviewed: 2026-05-14
 applies_to:
   - deploy/
   - backend/api/
@@ -94,6 +94,7 @@ Important runtime values in `deploy/.env`:
 - `REDIS_*`
 - `CLIENT_BASE_URL`
 - `AVATAR_S3_*`
+- `ATTACHMENT_IMAGE_*`
 - `OTS_SECRET`
 
 Important build-time values in `deploy/client.build.env`:
@@ -102,6 +103,16 @@ Important build-time values in `deploy/client.build.env`:
 - `VITE_LIVEKIT_WS_URL`
 
 `build_push.sh` uses `VITE_API_BASE` for both frontend images and `VITE_LIVEKIT_WS_URL` for the user client image.
+
+Attachment images use the same S3-compatible bucket settings as avatars and sounds. If API responses return presigned asset URLs, `AVATAR_S3_ENDPOINT` must be reachable from users' browsers, not only from the Docker network. For production, point it at the public S3 host routed by Caddy, for example `https://s3.example.com`; for purely local compose, `http://localhost:9000` is usually more useful than the internal `http://minio:9000`.
+
+Important attachment controls:
+
+- `ATTACHMENT_IMAGE_PENDING_TTL_SECONDS`: how long an uploaded-but-unsent image can stay `PENDING` before cleanup.
+- `ATTACHMENT_IMAGE_DELETED_RETENTION_SECONDS`: how long soft-deleted message images are retained before their objects are removed.
+- `ATTACHMENT_IMAGE_CLEANUP_*`: scheduled cleanup enablement, interval, and batch size.
+- `ATTACHMENT_IMAGE_MAX_PENDING_UPLOADS_*`: pending upload count limits per user and per channel/room scope.
+- `ATTACHMENT_IMAGE_MAX_STORED_BYTES_*`: stored display+thumbnail byte quotas per user and per channel/room scope.
 
 ## Build And Push Images
 
@@ -182,7 +193,8 @@ Check application behavior:
 - Login returns an `Authorization` header.
 - Client can request a LiveKit token.
 - A browser can connect to the configured LiveKit WebSocket URL.
-- Avatar or sound URLs resolve through the configured S3-compatible endpoint.
+- Avatar, sound, and message image URLs resolve through the configured S3-compatible endpoint.
+- Uploading an image and not sending the message eventually marks the attachment `DELETED` and removes its S3 objects after `ATTACHMENT_IMAGE_PENDING_TTL_SECONDS`.
 
 ## Migrations
 
@@ -211,9 +223,27 @@ Rollback is currently manual:
 
 Because migrations are forward-only, plan rollback before deploying risky database changes.
 
+## Attachment Cleanup
+
+The API owns message attachment cleanup. On each `ATTACHMENT_IMAGE_CLEANUP_FIXED_DELAY_MS` interval, it scans up to `ATTACHMENT_IMAGE_CLEANUP_BATCH_SIZE` expired rows:
+
+- `PENDING` rows older than `ATTACHMENT_IMAGE_PENDING_TTL_SECONDS`;
+- `DELETED` rows older than `ATTACHMENT_IMAGE_DELETED_RETENTION_SECONDS` whose objects were not removed yet.
+
+For each row, the API first claims the row with `status = DELETED` and `object_cleanup_after`, then deletes the display and thumbnail objects from S3 and records `objects_deleted_at`. If S3 deletion fails, `objects_deleted_at` remains empty and the row is left eligible for a later cleanup run.
+
+Operational check:
+
+```sql
+select status, count(*), min(created_at), max(created_at)
+from message_attachment
+group by status;
+```
+
+If `PENDING` rows keep growing, verify API logs for cleanup errors, confirm MinIO/S3 credentials, and lower `ATTACHMENT_IMAGE_PENDING_TTL_SECONDS` or the pending quota settings if users are abandoning many uploads.
+
 ## Known Cleanup Items
 
 - Add an `agents` service and image build path if production agents should be managed by this compose stack.
 - Decide whether `deploy/README.md` should be replaced by this runbook or kept as a short pointer.
 - Review generated env coverage: current `generate_envs.sh` does not generate a separate `admin.build.env`.
-

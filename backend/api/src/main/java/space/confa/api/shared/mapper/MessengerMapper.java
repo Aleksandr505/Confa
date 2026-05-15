@@ -42,6 +42,7 @@ public final class MessengerMapper {
         return new MessageDto(
                 entity.getId(),
                 entity.getChannelId(),
+                entity.getRoomId(),
                 entity.getSenderUserId(),
                 null,
                 entity.getKind(),
@@ -49,6 +50,7 @@ public final class MessengerMapper {
                 entity.getReplyToMessageId(),
                 null,
                 null,
+                List.of(),
                 List.of(),
                 entity.getCreatedAt(),
                 entity.getEditedAt(),

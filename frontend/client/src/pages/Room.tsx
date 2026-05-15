@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
     AudioTrack,
     CarouselLayout,
-    Chat,
     ConnectionQualityIndicator,
     ConnectionStateToast,
     ControlBar,
@@ -53,9 +52,15 @@ import {
     disableRoomAgents,
     fetchMyRooms,
     createInvite,
+    createRoomMessage,
+    fetchRoomMessages,
     resolveAvatarsBatch,
     type RoomAccess,
     type RoomInvite,
+    uploadMessageImage,
+    type MessageDto,
+    addMessageReaction,
+    removeMessageReaction,
 } from '../api';
 import '../styles/livekit-theme.css';
 import { getUserIdentity, isAdmin } from '../lib/auth.ts';
@@ -63,6 +68,10 @@ import { getAvatarColor, getAvatarUrl, setAvatarUrlOverride } from '../lib/avata
 import { ParticipantEvent, RoomEvent, Track } from 'livekit-client';
 import Soundboard from '../components/Soundboard';
 import { getErrorMessage } from '../lib/errors';
+import MessageTimeline from '../components/MessageTimeline';
+import MessageComposer from '../components/MessageComposer';
+import type { CompressedChatImage } from '../lib/imageCompression';
+import { mergeMessagesById } from '../lib/messageMerge';
 
 const wsUrl = import.meta.env.VITE_LIVEKIT_WS_URL as string;
 let presenceToneAudioCtx: AudioContext | null = null;
@@ -1595,12 +1604,234 @@ function BrandedVideoConference({
                     </div>
                 )}
                 {!disableChat && (
-                    <Chat style={{ display: widgetState.showChat ? 'grid' : 'none' }} />
+                    <RoomChatPanel roomName={roomName} visible={widgetState.showChat} />
                 )}
             </LayoutContextProvider>
             <RoomAudioRenderer muted={isDeafened} />
             <ConnectionStateToast />
         </div>
+    );
+}
+
+function RoomChatPanel({ roomName, visible }: { roomName: string; visible: boolean }) {
+    const [messages, setMessages] = useState<MessageDto[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
+    const [showScrollDown, setShowScrollDown] = useState(false);
+    const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<number, string>>({});
+    const resolvedAvatarByUserIdRef = useRef<Map<number, string | null>>(new Map());
+    const listRef = useRef<HTMLDivElement | null>(null);
+    const autoScrollRef = useRef(true);
+    const myUserId = useMemo(() => {
+        const identity = getUserIdentity();
+        if (!identity) return null;
+        const parsed = Number(identity);
+        return Number.isFinite(parsed) ? parsed : null;
+    }, []);
+    const avatarUserIds = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    messages
+                        .map(msg => msg.senderUserId)
+                        .filter((id): id is number => typeof id === 'number' && id > 0),
+                ),
+            ).sort((a, b) => a - b),
+        [messages],
+    );
+    const avatarUsersKey = avatarUserIds.join(',');
+
+    useEffect(() => {
+        resolvedAvatarByUserIdRef.current.clear();
+        setAvatarUrlByUserId({});
+    }, [roomName]);
+
+    useEffect(() => {
+        let active = true;
+
+        const loadMessages = async (silent: boolean) => {
+            if (!silent) {
+                setLoading(true);
+                setError(null);
+            }
+            try {
+                const page = await fetchRoomMessages(roomName);
+                if (!active) return;
+                const items = page.items.slice().reverse();
+                setMessages(prev => mergeMessagesById(prev, items));
+            } catch (e) {
+                if (!silent && active) {
+                    setError(getErrorMessage(e, 'Не удалось загрузить чат'));
+                }
+            } finally {
+                if (!silent && active) setLoading(false);
+            }
+        };
+
+        setMessages([]);
+        void loadMessages(false);
+        const timer = window.setInterval(() => {
+            if (document.hidden) return;
+            void loadMessages(true);
+        }, 3000);
+
+        return () => {
+            active = false;
+            window.clearInterval(timer);
+        };
+    }, [roomName]);
+
+    useEffect(() => {
+        if (!avatarUsersKey) {
+            resolvedAvatarByUserIdRef.current.clear();
+            setAvatarUrlByUserId({});
+            return;
+        }
+        const userIds = avatarUsersKey
+            .split(',')
+            .map(value => Number(value))
+            .filter(value => Number.isFinite(value) && value > 0);
+        const active = new Set(userIds);
+        for (const cachedUserId of resolvedAvatarByUserIdRef.current.keys()) {
+            if (!active.has(cachedUserId)) {
+                resolvedAvatarByUserIdRef.current.delete(cachedUserId);
+            }
+        }
+        const unresolvedUserIds = userIds.filter(userId => !resolvedAvatarByUserIdRef.current.has(userId));
+        if (unresolvedUserIds.length === 0) return;
+
+        let cancelled = false;
+        const syncAvatars = async () => {
+            try {
+                const items = await resolveAvatarsBatch(unresolvedUserIds, undefined, roomName);
+                if (cancelled) return;
+                const resolvedBatch = new Map<number, string | null>();
+                for (const item of items) {
+                    const resolvedUrl = item.contentUrl
+                        ? item.contentUrl.startsWith('http')
+                            ? item.contentUrl
+                            : `${import.meta.env.VITE_API_BASE}${item.contentUrl}`
+                        : null;
+                    resolvedBatch.set(item.userId, resolvedUrl);
+                }
+                setAvatarUrlByUserId(prev => {
+                    const next = { ...prev };
+                    let changed = false;
+                    for (const userId of unresolvedUserIds) {
+                        const url = resolvedBatch.get(userId) ?? null;
+                        resolvedAvatarByUserIdRef.current.set(userId, url);
+                        if (url) {
+                            if (next[userId] !== url) {
+                                next[userId] = url;
+                                changed = true;
+                            }
+                        } else if (next[userId]) {
+                            delete next[userId];
+                            changed = true;
+                        }
+                    }
+                    return changed ? next : prev;
+                });
+            } catch (e) {
+                if (!cancelled) console.warn('Failed to sync room chat avatars', e);
+            }
+        };
+
+        void syncAvatars();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [avatarUsersKey, roomName]);
+
+    useEffect(() => {
+        const list = listRef.current;
+        if (!list || !autoScrollRef.current) return;
+        list.scrollTop = list.scrollHeight;
+    }, [messages]);
+
+    const handleScroll = () => {
+        const list = listRef.current;
+        if (!list) return;
+        const threshold = 48;
+        const distanceToBottom = list.scrollHeight - list.scrollTop - list.clientHeight;
+        const atBottom = distanceToBottom <= threshold;
+        autoScrollRef.current = atBottom;
+        setShowScrollDown(!atBottom);
+    };
+
+    const scrollToBottom = () => {
+        const list = listRef.current;
+        if (!list) return;
+        list.scrollTop = list.scrollHeight;
+        autoScrollRef.current = true;
+        setShowScrollDown(false);
+    };
+
+    async function sendMessage(body: string, image?: CompressedChatImage) {
+        try {
+            const attachmentIds = image
+                ? [(await uploadMessageImage(image.file, { roomName })).id]
+                : [];
+            const msg = await createRoomMessage(roomName, body, replyTo?.id, attachmentIds);
+            setMessages(prev => [...prev, msg]);
+            setReplyTo(null);
+            setError(null);
+        } catch (e) {
+            setError(getErrorMessage(e, 'Не удалось отправить сообщение'));
+            throw e;
+        }
+    }
+
+    async function toggleReaction(message: MessageDto, emoji: string, reactedByMe: boolean) {
+        try {
+            const reactions = reactedByMe
+                ? await removeMessageReaction(message.id, emoji)
+                : await addMessageReaction(message.id, emoji);
+            setMessages(prev =>
+                prev.map(item => (item.id === message.id ? { ...item, reactions } : item)),
+            );
+        } catch (e) {
+            console.warn('Failed to toggle room chat reaction', e);
+        }
+    }
+
+    return (
+        <aside className="lk-room-chat-panel" data-visible={visible ? 'true' : 'false'}>
+            <div className="lk-room-chat-title">Chat</div>
+            <div className="message-panel lk-room-message-panel">
+                {loading ? (
+                    <div className="empty-subtitle">Loading messages…</div>
+                ) : error ? (
+                    <div className="alert-banner">{error}</div>
+                ) : messages.length === 0 ? (
+                    <div className="empty-subtitle">No messages yet.</div>
+                ) : (
+                    <MessageTimeline
+                        messages={messages}
+                        myUserId={myUserId}
+                        listRef={listRef}
+                        onScroll={handleScroll}
+                        avatarUrlByUserId={avatarUrlByUserId}
+                        onReply={setReplyTo}
+                        onToggleReaction={toggleReaction}
+                    />
+                )}
+                {showScrollDown && (
+                    <button className="scroll-down-btn" type="button" onClick={scrollToBottom}>
+                        Newer
+                    </button>
+                )}
+            </div>
+            <MessageComposer
+                key={`room-composer-${roomName}`}
+                placeholder={`Message ${roomName}`}
+                replyTo={replyTo}
+                onCancelReply={() => setReplyTo(null)}
+                onSend={sendMessage}
+            />
+        </aside>
     );
 }
 
